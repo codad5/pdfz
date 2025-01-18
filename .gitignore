@@ -1,0 +1,29 @@
+# Node.js
+**/node_modules/
+/**/package-lock.json
+**/.env
+
+# Rust
+**/target/
+/**/Cargo.lock
+
+# Docker
+**/.docker/
+
+# Shared Storage
+/shared_storage/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+/.idea/
+/*.sublime-workspace
+
+# Other
+*.swp

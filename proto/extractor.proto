@@ -1,0 +1,20 @@
+// proto/extractor.proto
+syntax = "proto3";
+
+package extractor;
+
+service ExtractorService {
+  rpc ExtractText (ExtractRequest) returns (stream ExtractionResponse);
+}
+
+message ExtractRequest {
+  string file_path = 1;
+  string job_id = 2;
+}
+
+message ExtractionResponse {
+  string job_id = 1;
+  string status = 2;
+  string text = 3;
+  // float progress = 4;
+}

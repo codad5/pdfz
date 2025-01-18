@@ -1,0 +1,19 @@
+[package]
+name = "pdfz"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+flate2 = "1.0.33"
+image = "0.25.2"
+lopdf = "0.34.0"
+pdf-extract = "0.8.0"
+pdfium-render = "0.8.25"
+rusty-tesseract = "1.1.10"
+prost = "0.13.4"
+tokio = {version = "1.43.0", features = ["full"]}
+tonic = "0.12.3"
+
+[build-dependencies]
+tonic-build = "0.12.3"

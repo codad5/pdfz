@@ -1,0 +1,54 @@
+services:
+  extractor:
+    build:
+      context: ./extractor
+      dockerfile: Dockerfile
+    volumes:
+      - ./extractor:/extractor
+      - cargo-cache:/usr/local/cargo/registry
+      - ./training_data:/training_data
+      - ./shared_storage:/shared_storage  # Shared storage for files
+      - ./proto:/extractor/proto  # Mount proto files
+    working_dir: /extractor
+    environment:
+      - RUST_LOG=debug
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "50051:50051"
+    depends_on:
+      - redis
+    command: ["cargo", "watch", "-x", "run"]
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+      - ./shared_storage:/shared_storage  # Shared storage for files
+      - ./proto:/app/proto  # Mount proto files
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - EXTRACTOR_URL=extractor:50051
+    depends_on:
+      - redis
+      - extractor
+    command: ["nodemon", "--watch", ".", "server.js"]
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  cargo-cache:
+  training_data:
+  redis-data:
+  shared_storage:
