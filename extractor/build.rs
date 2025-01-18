@@ -1,6 +1,5 @@
 fn main() {
     println!("build.rs running");
-    // to regenerate the code, run `cargo build`
     println!("cargo:rerun-if-changed=hello.proto");
     tonic_build::configure()
         .build_server(true)
