@@ -6,17 +6,25 @@ services:
     volumes:
       - ./extractor:/extractor
       - cargo-cache:/usr/local/cargo/registry
-      - ./training_data:/training_data
-      - ./shared_storage:/shared_storage  # Shared storage for files
-      - ./proto:/extractor/proto  # Mount proto files
+      - ${TRAINING_DATA_PATH}:/training_data
+      - ${SHARED_STORAGE_PATH}:/shared_storage
+      - ${PROTO_PATH}:/extractor/proto
     working_dir: /extractor
     environment:
       - RUST_LOG=debug
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=${REDIS_URL}
+      - REDIS_PORT=${REDIS_PORT}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:${RABBITMQ_PORT}
+      - EXTRACTOR_PORT=${EXTRACTOR_PORT}
+      - EXTRACTOR_URL=${EXTRACTOR_URL}
+      - SHARED_STORAGE_PATH=/shared_storage
+      - TRAINING_DATA_PATH=/training_data
+      - PROTO_PATH=/extractor/proto
     ports:
-      - "50051:50051"
+      - "${EXTRACTOR_PORT}:${EXTRACTOR_PORT}"
     depends_on:
       - redis
+      - rabbitmq
     command: ["cargo", "watch", "-x", "run"]
 
   api:
@@ -24,31 +32,55 @@ services:
       context: ./api
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "${API_PORT}:${API_PORT}"
     volumes:
       - ./api:/app
       - /app/node_modules
-      - ./shared_storage:/shared_storage  # Shared storage for files
-      - ./proto:/app/proto  # Mount proto files
+      - ${SHARED_STORAGE_PATH}:/shared_storage
+      - ${PROTO_PATH}:/app/proto
     environment:
       - NODE_ENV=development
-      - REDIS_URL=redis://redis:6379
-      - EXTRACTOR_URL=extractor:50051
+      - REDIS_URL=${REDIS_URL}
+      - REDIS_PORT=${REDIS_PORT}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:${RABBITMQ_PORT}
+      - EXTRACTOR_PORT=${EXTRACTOR_PORT}
+      - EXTRACTOR_URL=${EXTRACTOR_URL}
+      - SHARED_STORAGE_PATH=/shared_storage
+      - PROTO_PATH=/app/proto
+      - API_PORT=${API_PORT}
     depends_on:
       - redis
+      - rabbitmq
       - extractor
     command: ["nodemon", "--watch", ".", "server.js"]
 
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:${REDIS_PORT}"
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "${RABBITMQ_PORT}:5672"      # AMQP port
+      - "${RABBITMQ_UI_PORT}:15672"  # Management UI port
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
 volumes:
   cargo-cache:
   training_data:
   redis-data:
   shared_storage:
+  rabbitmq-data:

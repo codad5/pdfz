@@ -1,3 +1,5 @@
+pub mod queue;
+
 use tonic::{transport::Server, Request, Response, Status};
 use extractor::extractor_service_server::{ExtractorService, ExtractorServiceServer};
 use extractor::{ExtractionResponse, ExtractRequest};
