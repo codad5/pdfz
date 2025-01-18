@@ -24,10 +24,7 @@ app.get('/', (req: Request, res: Response) => {
 app.post('/upload', upload.single('pdf'), (req: Request, res: Response) => {
   try {
     if (!req.file) throw new Error('File is missing');
-    ResponseHelper.success({
-      message: 'File uploaded successfully',
-      file: req.file,
-    });
+    ResponseHelper.success(req.file);
   } catch (error) {
     ResponseHelper.error((error as Error).message ?? 'File upload failed', {message: (error as Error).message ?? 'File upload failed' });
   }
