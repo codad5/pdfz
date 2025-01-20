@@ -1,12 +1,14 @@
 use amiquip::{Connection, ConsumerMessage, ConsumerOptions, QueueDeclareOptions, Result};
 use serde_json;
 
-#[derive(Debug, serde::Deserialize)]
-struct NewFileProcessQueue {
-    file: String,
-    start_page: u32,
-    page_count: u32,
-    piority: i32,
+use crate::libs::extractor::extract_file;
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NewFileProcessQueue {
+    pub file: String,
+    pub start_page: u32,
+    pub page_count: u32,
+    pub piority: i32,
 }
 
 
@@ -40,7 +42,7 @@ pub async fn run_worker() -> Result<()> {
 
                 // Process the file (placeholder for your logic)
                 println!("Processing file: {}", msg.file);
-
+                extract_file(msg.clone());
                 // Acknowledge the message
                 consumer.ack(delivery)?;
             }
