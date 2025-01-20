@@ -55,6 +55,7 @@ pub async fn is_process_done(client: &Client, file_id: &str) -> RedisResult<bool
 async fn set_status(client: &Client, file_id: &str, status: Status) -> RedisResult<()> {
     let mut con = client.get_multiplexed_async_connection().await?;
     let key = format!("processing:{}", file_id);
+    println!("Redis ==> {} ==> status {}", file_id, status);
     con.set(key, status.to_string()).await
 }
 

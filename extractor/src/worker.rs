@@ -5,7 +5,7 @@ use tokio::sync::Semaphore;
 use tokio::task;
 use anyhow::{Result, Error};
 use crate::libs::extractor::extract_file;
-use crate::libs::redis::{get_redis_client, mark_as, mark_as_done, mark_as_failed, Status};
+use crate::libs::redis::{get_redis_client, mark_as, Status};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct NewFileProcessQueue {
@@ -28,8 +28,12 @@ async fn process_message(
     if let Err(e) = mark_as(&redis_client, id, status.clone()).await {
         return Err(Error::msg(format!("Error marking as {}:  {}", status, e)));
     }
-
-    Ok(())
+    return match status {
+        Status::Done => Ok(()),
+        Status::Failed => Err(Error::msg("Failed to process file")),
+        _ => Err(Error::msg("Unknown status")),
+        
+    }
 }
 
 pub async fn run_worker() -> AmiqpResult<()> {

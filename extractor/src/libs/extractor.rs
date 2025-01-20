@@ -13,7 +13,7 @@ use crate::{helper::file_helper, worker::NewFileProcessQueue};
 
 pub async fn extract_file(process_queue: NewFileProcessQueue) -> Result<(), Box<dyn std::error::Error>> {
     println!("Extracting file {}", process_queue.file);
-    let path = file_helper::get_upload_path(format!("{}.pdf", process_queue.file).as_str());
+    let path = file_helper::get_upload_path(format!("{}", process_queue.file).as_str());
     println!("Processing {:?}",  path);
     let doc = Document::load(path);
     if doc.is_err() {

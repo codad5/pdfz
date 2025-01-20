@@ -6,7 +6,7 @@ import mqConnection, { Queue } from '@/lib/rabbitmq';
 import { NewFileProcessQueue } from '@/types/queue';
 import { ProcessResponse, UploadResponse } from '@/types/response';
 import { ProcessOptions } from '@/types/request';
-import { isFileInProcess, startFileProcess } from '@/lib/redis';
+import { isFileInProcessing, startFileProcess } from '@/lib/redis';
 
 dotenv.config();
 
@@ -68,7 +68,7 @@ app.post('/process/:id', async (req: Request, res: Response) => {
             throw new Error('File not found');
         }
 
-        if (await isFileInProcess(id)) {
+        if (await isFileInProcessing(id)) {
             throw new Error('File is already in process');
         }
 

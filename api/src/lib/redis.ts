@@ -9,9 +9,10 @@ enum Status {
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
-export async function isFileInProcess(fileId: string): Promise<boolean> {
+export async function isFileInProcessing(fileId: string): Promise<boolean> {
     const status = await getFileStatus(fileId);
-    return status !== Status.PENDING;
+    console.log(status, "meant to be pe")
+    return status === Status.PENDING;
 }
 
 // check if process is done
@@ -26,6 +27,7 @@ async function setStatus(fileId: string, status: Status): Promise<void> {
 
 async function getFileStatus(fileId: string): Promise<Status> {
     const status = await redis.get(`processing:${fileId}`);
+    console.log("status", status)
     // return status enum based on status
     switch (status) {
         case "done":
