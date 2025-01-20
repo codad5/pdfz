@@ -3,22 +3,28 @@ import { ProcessOptions } from '@/types/request';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
-async function isFileInProcess(fileId: string): Promise<boolean> {
+export async function isFileInProcess(fileId: string): Promise<boolean> {
     const exists = await redis.get(`processing:${fileId}`);
+    // if progess is 100, then it's done processing then delete the key and return false
+    if (parseInt(exists ?? '') >= 100) {
+        return false;
+    }
     return !!exists;
 }
 
-async function markFileAsProcessing(
+// check if process is done
+export async function isProcessDone(fileId: string): Promise<boolean> {
+    const exists = await redis.get(`processing:${fileId}`);
+    return parseInt(exists ?? '') >= 100;
+}
+
+export async function markFileAsProcessing(
     fileId: string, 
-    options: ProcessOptions, 
     ttl: number = 3600
 ): Promise<void> {
     await redis.setex(
         `processing:${fileId}`, 
         ttl, 
-        JSON.stringify({
-            timestamp: new Date(),
-            options
-        })  
+        0 // initial progress 
     );
 }

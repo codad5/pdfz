@@ -6,6 +6,7 @@ import mqConnection, { Queue } from '@/lib/rabbitmq';
 import { NewFileProcessQueue } from '@/types/queue';
 import { ProcessResponse, UploadResponse } from '@/types/response';
 import { ProcessOptions } from '@/types/request';
+import { isFileInProcess, markFileAsProcessing } from '@/lib/redis';
 
 dotenv.config();
 
@@ -67,6 +68,10 @@ app.post('/process/:id', async (req: Request, res: Response) => {
             throw new Error('File not found');
         }
 
+        if (await isFileInProcess(id)) {
+            throw new Error('File is already in process');
+        }
+
         const d = await mqConnection.sendToQueue(Queue.NEW_FILE_EXTRACT, {
             file: `${id}.pdf`,
             start_page: startPage,
@@ -77,6 +82,8 @@ app.post('/process/:id', async (req: Request, res: Response) => {
         if (!d) {
             throw new Error('Failed to send file to queue');
         }
+
+        await markFileAsProcessing(id);
 
         ResponseHelper.success<ProcessResponse>({
             id,
@@ -109,3 +116,4 @@ async function startServer() {
 }
 
 startServer();
+
