@@ -18,6 +18,15 @@ export async function isProcessDone(fileId: string): Promise<boolean> {
     return parseInt(exists ?? '') >= 100;
 }
 
+async function setProgress(fileId: string, progress: number): Promise<void> {
+    await redis.set(`processing:${fileId}`, progress);
+}
+
+async function getProgress(fileId: string): Promise<number> {
+    const progress = await redis.get(`processing:${fileId}`);
+    return parseInt(progress ?? '0');
+}
+
 export async function markFileAsProcessing(
     fileId: string, 
     ttl: number = 3600

@@ -62,7 +62,7 @@ app.post('/process/:id', async (req: Request, res: Response) => {
         const params = req.body as ProcessOptions;
         const startPage = params?.startPage ?? 1;
         const pageCount = params?.pageCount ?? 0;
-        const priority = params?.priority ?? 0;
+        const priority = params?.priority ?? 1;
 
         if (!uploadExists(`${id}.pdf`)) {
             throw new Error('File not found');
@@ -75,8 +75,7 @@ app.post('/process/:id', async (req: Request, res: Response) => {
         const d = await mqConnection.sendToQueue(Queue.NEW_FILE_EXTRACT, {
             file: `${id}.pdf`,
             start_page: startPage,
-            page_count: pageCount,
-            piority: priority
+            page_count: pageCount
         });
 
         if (!d) {
