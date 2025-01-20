@@ -21,6 +21,7 @@ async fn process_message(
 ) -> Result<(), Error> {
     let mut status = Status::Done;
     if let Err(e) = extract_file(msg.clone()).await {
+        println!("Error processing file: {}", e);
         status = Status::Failed;
     }
 

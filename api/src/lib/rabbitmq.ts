@@ -20,27 +20,28 @@ class RabbitMQConnection {
     channel!: Channel;
     private connected!: boolean;
 
-    async connect() {
+    async connect(max_tries = 3) {
         if (this.connected && this.channel) return this;
-        else this.connected = true;
+        else this.connected = false;
+        for (let i = 0; i < max_tries; i++) {
+            if (this.connected) break;
+            try {
+                this.connection = await client.connect(
+                    RABBITMQ_URL || "amqp://localhost"
+                );
 
-        try {
-            console.log(`⌛️ Connecting to Rabbit-MQ Server`);
-            this.connection = await client.connect(
-                RABBITMQ_URL || "amqp://localhost"
-            );
+                console.log(`✅ Rabbit MQ Connection is ready`);
 
-            console.log(`✅ Rabbit MQ Connection is ready`);
+                this.channel = await this.connection.createChannel();
 
-            this.channel = await this.connection.createChannel();
-
-            console.log(`🛸 Created RabbitMQ Channel successfully`);
-            return this;
-        } catch (error) {
-            console.error(error);
-            console.error(`Not connected to MQ Server`);
-            this.connected = false;
-            throw error;
+                console.log(`🛸 Created RabbitMQ Channel successfully`);
+                this.connected = true;
+                return this;
+            } catch (error) {
+                console.error(`❌ Failed to connect to RabbitMQ Server. Retrying...`);
+                console.error(error);
+                this.connected = false;
+            }
         }
     }
 

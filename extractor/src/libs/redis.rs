@@ -86,3 +86,18 @@ pub async fn mark_as_failed(client: &Client, file_id: &str) -> RedisResult<()> {
 pub async fn mark_as(client: &Client, file_id: &str, status: Status) -> RedisResult<()> {
     set_status(client, file_id, status).await
 }
+
+pub async fn mark_progress(file_id: &str, page: u32, total: u32) -> RedisResult<()> {
+    let client = get_redis_client().await?;
+    let mut con = client.get_multiplexed_async_connection().await?;
+    let key = format!("progress:{}", file_id);
+    let value = if page == 0 || total == 0 {
+        0
+    } else {
+        (page * 100) / total
+    };
+    if value == 100 {
+        mark_as_done(&client, file_id).await?;
+    }
+    con.set(key, value).await
+}

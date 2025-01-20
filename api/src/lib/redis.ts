@@ -11,7 +11,7 @@ const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 export async function isFileInProcessing(fileId: string): Promise<boolean> {
     const status = await getFileStatus(fileId);
-    console.log(status, "meant to be pe")
+    console.log(status, "meant to be pe");
     return status === Status.PENDING;
 }
 
@@ -27,7 +27,7 @@ async function setStatus(fileId: string, status: Status): Promise<void> {
 
 async function getFileStatus(fileId: string): Promise<Status> {
     const status = await redis.get(`processing:${fileId}`);
-    console.log("status", status)
+    console.log("status", status);
     // return status enum based on status
     switch (status) {
         case "done":
@@ -48,4 +48,35 @@ export async function startFileProcess(
         ttl,
         Status.PENDING.toString()
     );
+}
+
+// Mark a file as done
+export async function markAsDone(fileId: string): Promise<void> {
+    await setStatus(fileId, Status.DONE);
+}
+
+// Mark a file as failed
+export async function markAsFailed(fileId: string): Promise<void> {
+    await setStatus(fileId, Status.FAILED);
+}
+
+// Mark progress for a file
+export async function markProgress(fileId: string, page: number, total: number): Promise<void> {
+    const progress = Math.floor((page / total) * 100);
+    await redis.set(`progress:${fileId}`, progress);
+
+    if (progress === 100) {
+        await markAsDone(fileId);
+    }
+}
+
+// Get progress for a file
+export async function getProgress(fileId: string): Promise<number> {
+    const progress = await redis.get(`progress:${fileId}`);
+    return progress ? parseInt(progress, 10) : 0;
+}
+
+// Mark a file with a specific status
+export async function markAs(fileId: string, status: Status): Promise<void> {
+    await setStatus(fileId, status);
 }

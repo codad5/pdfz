@@ -28,9 +28,12 @@ export interface ProcessResponse {
         pageCount: number;
         priority: 0 | 1 | 2;
     };
+    progress: number;
     status?: 'queued' | 'processing' | 'completed' | 'failed';
     queuedAt?: Date;
 }
+
+
 
 // You can use these types like this:
 // export type UploadPDFResponse = CustomResponse<UploadResponse>;

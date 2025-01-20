@@ -47,9 +47,6 @@ RUN git clone https://github.com/tesseract-ocr/tesstrain.git /tesstrain && \
 # Add tools to the PATH
 ENV PATH="/tesstrain:/tesstrain/venv/bin:/usr/local/cargo/bin:$PATH"
 
-# Expose the gRPC port
-EXPOSE 50051
-
 # Run the app with live reloading
-CMD ["cargo", "watch", "-x", "run"]
+CMD ["cargo", "run"]
 

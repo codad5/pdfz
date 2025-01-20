@@ -7,7 +7,7 @@ use flate2::read::ZlibDecoder;
 use std::io::prelude::*;
 use rusty_tesseract::{self, Args, Image};
 
-use crate::{helper::file_helper, worker::NewFileProcessQueue};
+use crate::{helper::file_helper, libs::redis::mark_progress, worker::NewFileProcessQueue};
 
 
 
@@ -15,6 +15,10 @@ pub async fn extract_file(process_queue: NewFileProcessQueue) -> Result<(), Box<
     println!("Extracting file {}", process_queue.file);
     let path = file_helper::get_upload_path(format!("{}", process_queue.file).as_str());
     println!("Processing {:?}",  path);
+    // check if file exists
+    if !path.exists() {
+        return Err(format!("File does not exist: {:?}", path).into());
+    }
     let doc = Document::load(path);
     if doc.is_err() {
         return Err(format!("Error loading PDF file: {}", doc.err().unwrap()).into());
@@ -26,6 +30,7 @@ pub async fn extract_file(process_queue: NewFileProcessQueue) -> Result<(), Box<
     let mut text_path: HashMap<u32, String> = HashMap::new();
     let mut text = String::new();
     let mut page_count = 0;
+    let file_id = process_queue.file.split('.').next().unwrap_or("");
     for (page_num, page_id) in doc.get_pages() {
         if page_count > process_queue.page_count {
             break;
@@ -33,7 +38,11 @@ pub async fn extract_file(process_queue: NewFileProcessQueue) -> Result<(), Box<
         if process_queue.start_page > page_num {
             continue;
         }
+        println!("Extracting page {}", page_num);
         let page_info = process_page(&doc, page_num, page_id);
+        println!("Extracted page {} with {} images", page_num, page_info.image_path.len());
+        // file id is file name without extension
+        mark_progress(file_id, page_num, process_queue.page_count).await?;
         page_count += 1;
     }
     Ok(())
