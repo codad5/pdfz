@@ -25,7 +25,7 @@ async function setStatus(fileId: string, status: Status): Promise<void> {
     await redis.set(`processing:${fileId}`, status.toString());
 }
 
-async function getFileStatus(fileId: string): Promise<Status> {
+async function getFileStatus(fileId: string): Promise<Status|null> {
     const status = await redis.get(`processing:${fileId}`);
     console.log("status", status);
     // return status enum based on status
@@ -34,8 +34,11 @@ async function getFileStatus(fileId: string): Promise<Status> {
             return Status.DONE;
         case "failed":
             return Status.FAILED;
-        default:
+        case 'pending':
             return Status.PENDING;
+        default:
+            return null;
+        
     }
 }
 

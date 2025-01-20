@@ -69,6 +69,7 @@ app.post('/process/:id', async (req: Request, res: Response) => {
         }
 
         if (await isFileInProcessing(id)) {
+            console.log('File is already in processing');
             let progress = await getProgress(id);
             if(!progress) {
                 progress = 0;
@@ -87,7 +88,9 @@ app.post('/process/:id', async (req: Request, res: Response) => {
         const d = await mqConnection.sendToQueue(Queue.NEW_FILE_EXTRACT, {
             file: `${id}.pdf`,
             start_page: startPage,
-            page_count: pageCount
+            page_count: pageCount, 
+            format: 'text',
+            engine: 'tesseract',
         });
 
         if (!d) {
