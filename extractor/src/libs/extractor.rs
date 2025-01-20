@@ -11,10 +11,15 @@ use crate::{helper::file_helper, worker::NewFileProcessQueue};
 
 
 
-pub async fn extract_file(process_queue: NewFileProcessQueue) {
-    println!("Extracting file...");
-    let path = file_helper::get_upload_path(process_queue.file.as_str());
-    let doc: Document = Document::load(path).unwrap();
+pub async fn extract_file(process_queue: NewFileProcessQueue) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Extracting file {}", process_queue.file);
+    let path = file_helper::get_upload_path(format!("{}.pdf", process_queue.file).as_str());
+    println!("Processing {:?}",  path);
+    let doc = Document::load(path);
+    if doc.is_err() {
+        return Err(format!("Error loading PDF file: {}", doc.err().unwrap()).into());
+    }
+    let doc = doc.unwrap();
     // store image path in hash map with page number as key in testing for commit 
     let mut image_path: HashMap<u32, Vec<String>> = HashMap::new();
     // store text path in hash map with page number as key
@@ -31,6 +36,7 @@ pub async fn extract_file(process_queue: NewFileProcessQueue) {
         let page_info = process_page(&doc, page_num, page_id);
         page_count += 1;
     }
+    Ok(())
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

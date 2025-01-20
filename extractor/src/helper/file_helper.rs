@@ -3,28 +3,32 @@ use std::fs;
 
 pub fn get_upload_path(file: &str) -> PathBuf {
     let base_path = std::env::var("SHARED_STORAGE_PATH").unwrap();
-    let path = Path::new(&base_path).join(format!("upload/{}", file));
+    let folder_path = Path::new(&base_path).join("upload");
 
-    // Ensure the parent directory exists, create if it doesn't
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent).expect("Failed to create parent directory for upload path");
-        }
+    println!("Folder path: {:?}", folder_path);
+
+    // Ensure the folder exists before using it
+    if !folder_path.exists() {
+        fs::create_dir_all(&folder_path).expect("Failed to create upload directory");
     }
 
+    // Now construct the file path
+    let path = folder_path.join(file);
     path
 }
 
 pub fn get_pdf_image_process_path(file: &str) -> PathBuf {
     let base_path = std::env::var("SHARED_STORAGE_PATH").unwrap();
-    let path = Path::new(&base_path).join(format!("pdf_image_process/{}", file));
+    let folder_path = Path::new(&base_path).join("pdf_image_process");
 
-    // Ensure the parent directory exists, create if it doesn't
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent).expect("Failed to create parent directory for pdf image process path");
-        }
+    println!("Folder path: {:?}", folder_path);
+
+    // Ensure the folder exists before using it
+    if !folder_path.exists() {
+        fs::create_dir_all(&folder_path).expect("Failed to create pdf image process directory");
     }
 
+    // Now construct the file path
+    let path = folder_path.join(file);
     path
 }

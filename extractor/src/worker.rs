@@ -1,11 +1,11 @@
 use std::sync::Arc;
-
-use amiquip::{Connection, ConsumerMessage, ConsumerOptions, QueueDeclareOptions, Result};
+use amiquip::{Connection, ConsumerMessage, ConsumerOptions, QueueDeclareOptions, Result as AmiqpResult};
 use serde_json;
 use tokio::sync::Semaphore;
 use tokio::task;
+use anyhow::{Result, Error};
 use crate::libs::extractor::extract_file;
-use crate::libs::redis::{get_redis_client, mark_as_done};
+use crate::libs::redis::{get_redis_client, mark_as, mark_as_done, mark_as_failed, Status};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct NewFileProcessQueue {
@@ -14,57 +14,76 @@ pub struct NewFileProcessQueue {
     pub page_count: u32,
 }
 
-pub async fn run_worker() -> Result<()> {
-    let connection_url = std::env::var("RABBITMQ_URL").expect("RABBITMQ_URL must be set");
+// Helper function to process a single message
+async fn process_message(
+    msg: NewFileProcessQueue,
+    redis_client: Arc<redis::Client>,
+) -> Result<(), Error> {
+    let mut status = Status::Done;
+    if let Err(e) = extract_file(msg.clone()).await {
+        status = Status::Failed;
+    }
 
+    let id = msg.file.split('.').next().unwrap_or("");
+    if let Err(e) = mark_as(&redis_client, id, status.clone()).await {
+        return Err(Error::msg(format!("Error marking as {}:  {}", status, e)));
+    }
+
+    Ok(())
+}
+
+pub async fn run_worker() -> AmiqpResult<()> {
+    let connection_url = std::env::var("RABBITMQ_URL").expect("RABBITMQ_URL must be set");
+    
     // Connect to RabbitMQ server
     let mut connection = Connection::insecure_open(&connection_url)?;
-    let redis_client = get_redis_client().await.unwrap();
+    let redis_client = Arc::new(get_redis_client().await.unwrap());
     println!("Connected to RabbitMQ");
-
+    
     // Open a channel
     let channel = connection.open_channel(None)?;
-
+    
     // Declare the queue
     let queue = channel.queue_declare("NEW_FILE_EXTRACT", QueueDeclareOptions {
         durable: true,
         ..QueueDeclareOptions::default()
     })?;
-
+    
     // Start consuming messages
     let consumer = queue.consume(ConsumerOptions::default())?;
     println!("Waiting for messages...");
-
-    // Semaphore to limit concurrency to 5 tasks
-    // let semaphore = Semaphore::new(5);
+    
     let semaphore = Arc::new(Semaphore::new(5));
-
+    
     for message in consumer.receiver().iter() {
         match message {
             ConsumerMessage::Delivery(delivery) => {
                 // Parse the JSON message into the struct
-                let msg: NewFileProcessQueue = serde_json::from_slice(&delivery.body).unwrap();
+                let msg: NewFileProcessQueue = match serde_json::from_slice(&delivery.body) {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        println!("Error parsing message: {}", e);
+                        consumer.ack(delivery)?;
+                        continue;
+                    }
+                };
                 println!("Received: {:?}", msg);
-
-                // Acquire a permit to ensure we don't exceed concurrency limit
+                
                 let redis_client = redis_client.clone();
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
-
-                // Spawn a new async task to process the file
+                
+                // Spawn task with explicit Send error handling
                 task::spawn(async move {
                     println!("Processing file: {}", msg.file);
-
-                    // Process the file (your logic goes here)
-                    extract_file(msg.clone()).await;
-                    // id is the file name without extension
-                    let id = msg.file.split('.').collect::<Vec<&str>>()[0];
-                    mark_as_done(&redis_client, id).await.unwrap();
-
-                    // Permit is dropped here automatically, allowing another task to start
+                    
+                    match process_message(msg.clone(), redis_client).await {
+                        Ok(_) => println!("File processed successfully"),
+                        Err(e) => println!("{}", e),
+                    }
+                    
                     drop(permit);
                 });
-
-                // Acknowledge the message
+                
                 consumer.ack(delivery)?;
             }
             other => {
@@ -73,7 +92,7 @@ pub async fn run_worker() -> Result<()> {
             }
         }
     }
-
+    
     println!("Closing connection");
     connection.close()
 }

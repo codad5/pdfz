@@ -6,7 +6,7 @@ import mqConnection, { Queue } from '@/lib/rabbitmq';
 import { NewFileProcessQueue } from '@/types/queue';
 import { ProcessResponse, UploadResponse } from '@/types/response';
 import { ProcessOptions } from '@/types/request';
-import { isFileInProcess, markFileAsProcessing } from '@/lib/redis';
+import { isFileInProcess, startFileProcess } from '@/lib/redis';
 
 dotenv.config();
 
@@ -82,7 +82,7 @@ app.post('/process/:id', async (req: Request, res: Response) => {
             throw new Error('Failed to send file to queue');
         }
 
-        await markFileAsProcessing(id);
+        await startFileProcess(id);
 
         ResponseHelper.success<ProcessResponse>({
             id,
