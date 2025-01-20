@@ -17,6 +17,7 @@ services:
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:${RABBITMQ_PORT}
       - EXTRACTOR_PORT=${EXTRACTOR_PORT}
       - EXTRACTOR_URL=${EXTRACTOR_URL}
+      - RABBITMQ_EXTRACTOR_QUEUE=${RABBITMQ_EXTRACTOR_QUEUE}
       - SHARED_STORAGE_PATH=/shared_storage
       - TRAINING_DATA_PATH=/training_data
       - PROTO_PATH=/extractor/proto
@@ -48,6 +49,7 @@ services:
       - SHARED_STORAGE_PATH=/shared_storage
       - PROTO_PATH=/app/proto
       - API_PORT=${API_PORT}
+      - RABBITMQ_EXTRACTOR_QUEUE=${RABBITMQ_EXTRACTOR_QUEUE}
     depends_on:
       - redis
       - rabbitmq

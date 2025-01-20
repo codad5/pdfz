@@ -37,3 +37,8 @@ export const upload = multer({
     cb(null, true); // Accept the file
   },
 });
+
+
+export const uploadExists = (filename: string) => {
+  return fs.existsSync(path.join(pdfUploadPath, filename));
+}
