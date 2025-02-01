@@ -10,7 +10,7 @@ use crate::{engine::tesseract::TesseractEngine, helper::file_helper::save_proces
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct PageExtractInfo {
     pub page_num: u32,
-    pub text: HashMap<u32, String>,
+    pub text:  String,
     pub image_path: Vec<String>,
     pub image_text: Vec<String>,
 }

@@ -64,10 +64,10 @@ impl TesseractEngine {
     fn process_page(doc: &Document, page_num: u32, page_id: (u32, u16)) -> PageExtractInfo {
         let mut image_paths: Vec<String> = vec![];
         let mut image_text: Vec<String> = vec![];
-        let mut text_map: HashMap<u32, String> = HashMap::new();
+        let mut text_map: Vec<String> = Vec::new();
 
         if let Ok(text_content) = doc.extract_text(&[page_num]) {
-            text_map.insert(page_num, text_content);
+            text_map.push(text_content);
         }
 
         if let Ok(page_images) = doc.get_page_images(page_id) {
@@ -86,7 +86,7 @@ impl TesseractEngine {
 
         PageExtractInfo {
             page_num,
-            text: text_map,
+            text: text_map.join(" "),
             image_path: image_paths,
             image_text,
         }
