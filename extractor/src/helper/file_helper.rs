@@ -1,6 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::fs;
 
+use crate::types::engine_handler::PageExtractInfo;
+
+
 pub fn get_upload_path(file: &str) -> PathBuf {
     let base_path = std::env::var("SHARED_STORAGE_PATH").unwrap();
     let folder_path = Path::new(&base_path);
@@ -46,4 +49,29 @@ pub fn get_pdf_image_process_path(file: &str) -> PathBuf {
     // Now construct the file path
     let path = folder_path.join(file);
     path
+}
+
+
+pub fn save_processed_json(data : Vec<PageExtractInfo>, file_id : &str){
+    let base_path = std::env::var("SHARED_STORAGE_PATH").unwrap();
+    let folder_path = Path::new(&base_path).join("processed");
+    if !folder_path.exists() {
+        fs::create_dir_all(&folder_path)
+            .expect("Failed to create processed directory");
+
+    }
+    // Extract the file ID without extension if needed
+    let clean_id = file_id.split('.').next().unwrap_or(file_id);
+      
+    // Create the full file path for the JSON
+    let json_path = folder_path.join(format!("{}.json", clean_id));
+    
+     let json_content = serde_json::to_string_pretty(&data)
+        .expect( "Failed to serialize data");
+
+    // Write the JSON content to the file
+    fs::write(&json_path, json_content).expect("Failed to write JSON file");
+
+    println!("Processed JSON saved to {:?}", json_path);
+
 }
