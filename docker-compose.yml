@@ -8,7 +8,6 @@ services:
       - cargo-cache:/usr/local/cargo/registry
       - ${TRAINING_DATA_PATH}:/training_data
       - ${SHARED_STORAGE_PATH}:/shared_storage
-      - ${PROTO_PATH}:/extractor/proto
     working_dir: /extractor
     environment:
       - RUST_LOG=debug
@@ -20,7 +19,6 @@ services:
       - RABBITMQ_EXTRACTOR_QUEUE=${RABBITMQ_EXTRACTOR_QUEUE}
       - SHARED_STORAGE_PATH=/shared_storage
       - TRAINING_DATA_PATH=/training_data
-      - PROTO_PATH=/extractor/proto
     depends_on:
       - redis
       - rabbitmq
@@ -36,7 +34,6 @@ services:
       - ./api:/app
       - /app/node_modules
       - ${SHARED_STORAGE_PATH}:/shared_storage
-      - ${PROTO_PATH}:/app/proto
     environment:
       - NODE_ENV=development
       - REDIS_URL=${REDIS_URL}
@@ -52,7 +49,7 @@ services:
       - redis
       - rabbitmq
       - extractor
-    command: ["nodemon", "--watch", ".", "server.js"]
+    command: ["npm", "run", "dev"]
 
   redis:
     image: redis:7-alpine
