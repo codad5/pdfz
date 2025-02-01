@@ -9,30 +9,6 @@ pub struct NewFileProcessQueue {
     pub engine: String,
 }
 
-// // Helper function to process a single message
-// async fn process_message(
-//     msg: NewFileProcessQueue,
-//     redis_client: Arc<redis::Client>,
-// ) -> Result<(), Error> {
-//     let mut status = Status::Done;
-//     if let Err(e) = extract_file(msg.clone()).await {
-//         println!("Error processing file: {}", e);
-//         status = Status::Failed;
-//     }
-
-//     let id = msg.file.split('.').next().unwrap_or("");
-//     if let Err(e) = mark_as(&redis_client, id, status.clone()).await {
-//         return Err(Error::msg(format!("Error marking as {}:  {}", status, e)));
-//     }
-//     return match status {
-//         Status::Done => Ok(()),
-//         Status::Failed => Err(Error::msg("Failed to process file")),
-//         _ => Err(Error::msg("Unknown status")),
-        
-//     }
-// }
-
-
 
 
 
@@ -112,4 +88,28 @@ pub async fn run_worker() -> Result<(), amiquip::Error> {
     
 //     println!("Closing connection");
 //     connection.close()
+// }
+
+
+// // Helper function to process a single message
+// async fn process_message(
+//     msg: NewFileProcessQueue,
+//     redis_client: Arc<redis::Client>,
+// ) -> Result<(), Error> {
+//     let mut status = Status::Done;
+//     if let Err(e) = extract_file(msg.clone()).await {
+//         println!("Error processing file: {}", e);
+//         status = Status::Failed;
+//     }
+
+//     let id = msg.file.split('.').next().unwrap_or("");
+//     if let Err(e) = mark_as(&redis_client, id, status.clone()).await {
+//         return Err(Error::msg(format!("Error marking as {}:  {}", status, e)));
+//     }
+//     return match status {
+//         Status::Done => Ok(()),
+//         Status::Failed => Err(Error::msg("Failed to process file")),
+//         _ => Err(Error::msg("Unknown status")),
+        
+//     }
 // }
