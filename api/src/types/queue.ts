@@ -6,3 +6,14 @@ export type NewFileProcessQueue = {
     format: 'text' | 'json'; // output format
     engine: 'tesseract'; // processing engine
 }
+
+export type ProcessedFilePage = {
+    page_num: number,
+    text: String, 
+}
+
+export type ProcessedFile = ProcessedFilePage[];
+
+
+
+export type Status = 'queued' | 'processing' | 'completed' | 'failed'

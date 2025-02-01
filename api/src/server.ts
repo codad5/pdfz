@@ -1,12 +1,13 @@
 import express, { Express, Request, Response, Application } from 'express';
 import dotenv from 'dotenv';
-import { upload, uploadExists } from '@/helpers/uploadhelper';
+import { upload, uploadExists, processedExists, getProcessedFilePath } from '@/helpers/uploadhelper';
 import { ResponseHelper } from '@/helpers/response';
 import mqConnection, { Queue } from '@/lib/rabbitmq';
-import { NewFileProcessQueue } from '@/types/queue';
-import { ProcessResponse, UploadResponse } from '@/types/response';
+import { NewFileProcessQueue, ProcessedFile } from '@/types/queue';
+import { ProcessResponse, UploadResponse, ProgressResponse, FinalResponse } from '@/types/response';
 import { ProcessOptions } from '@/types/request';
 import { getProgress, isFileInProcessing, startFileProcess } from '@/lib/redis';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -116,6 +117,59 @@ app.post('/process/:id', async (req: Request, res: Response) => {
     }
 });
 
+app.get('/progress/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        if (!uploadExists(`${id}.pdf`)) {
+            throw new Error('File not found');
+        }
+
+        const progress = await getProgress(id);
+        const status = await isFileInProcessing(id) ? 'processing' : 'completed';
+
+        ResponseHelper.success<ProgressResponse>({
+            id,
+            progress: progress ?? 0,
+            status,
+            message: 'Progress retrieved successfully'
+        });
+    } catch (error) {
+        ResponseHelper.error(
+            (error as Error).message ?? 'Failed to retrieve progress',
+            { message: (error as Error).message ?? 'Failed to retrieve progress' }
+        );
+    }
+});
+
+app.get('/content/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        const processedFilePath = getProcessedFilePath(`${id}.json`);
+
+        if (!processedExists(`${id}.json`)) {
+
+            throw new Error('Processed file not found');
+        }
+
+        const processedContent = fs.readFileSync(processedFilePath, 'utf-8');
+        const content = JSON.parse(processedContent); // Parse the JSON content
+
+        ResponseHelper.success<FinalResponse>({
+            id,
+            content : content as ProcessedFile,
+            message: 'Processed content retrieved successfully',
+            status: 'completed'
+        });
+    } catch (error) {
+        ResponseHelper.error(
+            (error as Error).message ?? 'Failed to retrieve processed content',
+            { message: (error as Error).message ?? 'Failed to retrieve processed content' }
+        );
+    }
+});
+
 // Start server only after establishing connections
 async function startServer() {
     const isConnected = await initializeConnections();
@@ -131,4 +185,3 @@ async function startServer() {
 }
 
 startServer();
-

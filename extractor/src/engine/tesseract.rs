@@ -67,6 +67,7 @@ impl TesseractEngine {
         let mut text_map: Vec<String> = Vec::new();
 
         if let Ok(text_content) = doc.extract_text(&[page_num]) {
+            // println!("String found from page {} : {}", page_num, text_content);
             text_map.push(text_content);
         }
 

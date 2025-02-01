@@ -1,3 +1,5 @@
+import { ProcessedFile, Status } from "./queue";
+
 export interface SuccessResponse<T> {
     success: true;
     message: string;
@@ -29,9 +31,24 @@ export interface ProcessResponse {
         priority: 0 | 1 | 2;
     };
     progress: number;
-    status?: 'queued' | 'processing' | 'completed' | 'failed';
+    status?: Status;
     queuedAt?: Date;
 }
+
+export interface ProgressResponse {
+    id: string;
+    progress: number;
+    status: Status;
+    message?: string;
+}
+
+export interface FinalResponse {
+    id: string;
+    content: ProcessedFile;
+    message: string;
+    status: Status;
+}
+
 
 
 
