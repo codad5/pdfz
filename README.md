@@ -97,7 +97,6 @@ Stay tuned for updates!
 - `EXTRACTOR_PORT` - Service port
 - `SHARED_STORAGE_PATH` - Mounted storage
 - `TRAINING_DATA_PATH` - Path to Tesseract training data
-- `PROTO_PATH` - Path to Protobuf files
 
 ### API Service (Node.js)
 
@@ -106,7 +105,6 @@ Stay tuned for updates!
 - `RABBITMQ_URL` - RabbitMQ connection
 - `API_PORT` - API listening port
 - `SHARED_STORAGE_PATH` - Mounted storage
-- `PROTO_PATH` - Path to Protobuf files
 
 ---
 
