@@ -34,6 +34,7 @@ impl EngineHandler for OllamaEngine {
     {
         let model = self.model.clone();
         Box::pin(async move {
+            println!("reached here from ollama methid");
             let bytes = fs::read(image_path.as_str())
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
 

@@ -102,10 +102,15 @@ impl MainEngine {
                     //     self.engine.extract_text_from_image(img_path.to_string())
                     // );
                     println!("Extracting page content with {:?}", self.engine);
-                    if let Ok(extracted_text) = self.engine.extract_text_from_image(img_path.to_string()).await {
-                        println!("Gotten content of leng {:?} from {:?}", extracted_text.len(), self.engine);
-                        image_text.push(extracted_text);
-                        image_paths.push(image_name);
+                    match self.engine.extract_text_from_image(img_path.to_string()).await {
+                        Ok(extracted_text) => {
+                            println!("Gotten content of leng {:?} from {:?}", extracted_text.len(), self.engine);
+                            image_text.push(extracted_text);
+                            image_paths.push(image_name);
+                        }
+                        Err(e) => {
+                            println!("Error processing image with engine {:?} giving error  {:?}", self.engine, e);
+                        }
                     }
                 }
             }
