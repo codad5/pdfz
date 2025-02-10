@@ -16,7 +16,8 @@ import {
     getModelProgress,
     getModelStatus,
     ModelStatus,
-    modelDownloadService
+    modelDownloadService,
+    fileProcessingService
 } from '@/lib/redis';
 import fs from 'fs';
 import { Ollama } from 'ollama';
@@ -76,18 +77,15 @@ app.post('/upload', upload.single('pdf'), async (req: Request, res: Response) =>
 app.post('/process/:id', async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const params = req.body as ProcessOptions;
-        const startPage = params?.startPage ?? 1;
-        const pageCount = params?.pageCount ?? 0;
-        const priority = params?.priority ?? 1;
+        const { startPage = 1, pageCount = 0, priority = 1, engine = 'tesseract', model = '' } = req.body as ProcessOptions;
 
         if (!uploadExists(`${id}.pdf`)) {
             throw new Error('File not found');
         }
 
-        if (await isFileInProcessing(id)) {
+        if (await fileProcessingService.isFileInProcessing(id)) {
             console.log('File is already in processing');
-            const progress = await getFileProgress(id) ?? 0;
+            const progress = await fileProcessingService.getFileProgress(id) ?? 0;
             
             ResponseHelper.success<ProcessResponse>({
                 id,
@@ -100,19 +98,29 @@ app.post('/process/:id', async (req: Request, res: Response) => {
             return;
         }
 
+        if (engine === 'ollama') {
+            const availableModels = await ollama.list();
+            const modelExists = availableModels.models.some(m => m.name === model);
+
+            if (!modelExists) {
+                throw new Error(`Model ${model} is not available. Please use the /model/pull endpoint to download it.`);
+            }
+        }
+
         const d = await mqConnection.sendToQueue(Queue.NEW_FILE_EXTRACT, {
             file: `${id}.pdf`,
             start_page: startPage,
             page_count: pageCount, 
             format: 'text',
-            engine: 'tesseract',
+            engine, 
+            model
         });
 
         if (!d) {
             throw new Error('Failed to send file to queue');
         }
 
-        await startFileProcess(id);
+        await fileProcessingService.startFileProcess(id);
 
         ResponseHelper.success<ProcessResponse>({
             id,
@@ -123,6 +131,7 @@ app.post('/process/:id', async (req: Request, res: Response) => {
             progress: 0,
             queuedAt: new Date()
         });
+
     } catch (error) {
         ResponseHelper.error(
             (error as Error).message ?? 'File processing failed',
@@ -139,8 +148,8 @@ app.get('/progress/:id', async (req: Request, res: Response) => {
             throw new Error('File not found');
         }
 
-        const progress = await getFileProgress(id);
-        const status = await isFileInProcessing(id) ? 'processing' : 'completed';
+        const progress = await fileProcessingService.getFileProgress(id);
+        const status = await fileProcessingService.isFileInProcessing(id) ? 'processing' : 'completed';
 
         ResponseHelper.success<ProgressResponse>({
             id,

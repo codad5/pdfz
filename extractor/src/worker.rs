@@ -7,6 +7,7 @@ pub struct NewFileProcessQueue {
     pub start_page: u32,
     pub page_count: u32,
     pub engine: String,
+    pub model : Option<String>
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

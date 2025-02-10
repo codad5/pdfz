@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, thread};
 use amiquip::{Channel, Connection, ConsumerMessage, ConsumerOptions, Delivery, QueueDeclareOptions, Result as AmiqpResult};
 use futures_lite::StreamExt;
 use ollama_rs::{models::pull::PullModelStatusStream, Ollama};
@@ -86,7 +86,7 @@ impl RabbitMQFileProcessor {
         // Create a new channel specifically for this task
         let channel = self.rabbit_mq_conn.open_channel(None);
         if let Ok(channel) = channel {
-            tokio::spawn(async move {
+            tokio::spawn(async move  {
                 if let Ok(queue) = channel.queue_declare(
                     "OLLAMA_MODEL_PULL",
                     QueueDeclareOptions {
@@ -97,55 +97,15 @@ impl RabbitMQFileProcessor {
                     if let Ok(consumer) = queue.consume(ConsumerOptions::default()) {
                         // Handle consumer messages here
                         println!("Ollama model pull queue consumer started");
-                        
                         // You might want to add a loop here to handle messages
                         for message in consumer.receiver().iter() {
                             match message {
                                 ConsumerMessage::Delivery(delivery) => {
-                                    // Handle the delivery
-                                    // let ollama =  Ollama::default();
                                     let message_detail = Self::get_model_message(&delivery);
-
                                     if message_detail.is_ok() {
                                         let message_detail = message_detail.unwrap();
-                                        let rt = tokio::runtime::Runtime::new().unwrap();
-                                        rt.block_on(async {
-                                            let redis_client = get_redis_client().await;
-                                            if  redis_client.is_err() {
-                                                return;
-                                            }
-                                            let redis_client = redis_client.unwrap();
-                                            let ollama = Ollama::default();
-                                            let model_name = message_detail.name.clone();
-                                            let  model_stream = ollama.pull_model_stream(model_name, false).await;
-                                            if model_stream.is_ok() {
-                                                let mut model_stream : PullModelStatusStream = model_stream.unwrap();
-                                                while let Some(d) = model_stream.next().await {
-                                                    if d.is_err() {
-                                                        println!("failed to download model : {}", message_detail.name);
-                                                        mark_model_as_failed(&redis_client, &message_detail.name).await;
-                                                        break;
-                                                    }
-
-                                                    let d = d.unwrap();
-                                                    let completed = match d.completed {
-                                                        Some(g) => g, 
-                                                        None => 1,
-                                                    };
-
-                                                    let total: u64 = match d.total {
-                                                        Some(g) => g, 
-                                                        None => 2,
-                                                    };
-                                                    update_model_progress(&redis_client, &message_detail.name, completed, total);            
-                                                }
-                                                mark_model_as_completed(&redis_client, &message_detail.name).await;
-                                            }
-                                            // Handle the stream result here if needed
-                                        });;
-
-                                    }
-
+                                        // download_model_stream(message_detail.name).await;
+                                    }                                    
                                     if let Err(e) = consumer.ack(delivery) {
                                         println!("Failed to acknowledge message: {:?}", e);
                                     }
@@ -161,4 +121,37 @@ impl RabbitMQFileProcessor {
             });
         }
     }
+}
+
+async fn download_model_stream(model_name : String){
+// rt.block_on(async {
+    let redis_client = get_redis_client().await;
+    if  redis_client.is_err() {
+        return;
+    }
+    let redis_client = redis_client.unwrap();
+    let ollama = Ollama::default();
+    let  model_stream = ollama.pull_model_stream(model_name.clone(), false).await;
+
+        let mut model_stream : PullModelStatusStream = model_stream.unwrap();
+        while let Some(d) = model_stream.next().await {
+            if d.is_err() {
+                println!("failed to download model : {}", model_name);
+                mark_model_as_failed(&redis_client, &model_name).await;
+                break;
+            }
+
+            let d = d.unwrap();
+            let completed = match d.completed {
+                Some(g) => g, 
+                None => 1,
+            };
+
+            let total: u64 = match d.total {
+                Some(g) => g, 
+                None => 2,
+            };
+            update_model_progress(&redis_client, &model_name, completed, total).await;         
+        }
+        mark_model_as_completed(&redis_client, &model_name).await;
 }
