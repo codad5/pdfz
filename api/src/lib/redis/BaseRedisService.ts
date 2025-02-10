@@ -1,12 +1,14 @@
 // src/lib/redis/BaseRedisService.ts
 import { Redis } from 'ioredis';
 
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+export default redis;
 export abstract class BaseRedisService {
     protected redis: Redis;
     protected prefix: string;
 
     constructor(prefix: string) {
-        this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+        this.redis = redis;
         this.prefix = prefix;
     }
 

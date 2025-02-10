@@ -1,9 +1,11 @@
 use std::sync::Arc;
 use amiquip::{Channel, Connection, ConsumerMessage, ConsumerOptions, Delivery, QueueDeclareOptions, Result as AmiqpResult};
+use futures_lite::StreamExt;
+use ollama_rs::{models::pull::PullModelStatusStream, Ollama};
 use redis::Client;
 use tokio::sync::Semaphore;
 
-use crate::{libs::redis::get_redis_client, types::engine_handler::Engines, worker::NewFileProcessQueue};
+use crate::{libs::redis::{get_redis_client, mark_model_as_completed, mark_model_as_failed, update_model_progress}, types::engine_handler::Engines, worker::{NewFileProcessQueue, OllamaModelPull}};
 
 pub struct RabbitMQFileProcessor {
     rabbit_mq_conn: Connection,
@@ -69,6 +71,13 @@ impl RabbitMQFileProcessor {
         Ok(msg)
     }
 
+
+    fn get_model_message(delivery: &Delivery) -> Result<OllamaModelPull, &'static str> {
+        let msg = serde_json::from_slice::<OllamaModelPull>(&delivery.body)
+            .map_err(|_| "Failed to parse message")?;
+        Ok(msg)
+    }
+
     fn close_conn(self) -> AmiqpResult<()> {
         self.rabbit_mq_conn.close()
     }
@@ -94,6 +103,49 @@ impl RabbitMQFileProcessor {
                             match message {
                                 ConsumerMessage::Delivery(delivery) => {
                                     // Handle the delivery
+                                    // let ollama =  Ollama::default();
+                                    let message_detail = Self::get_model_message(&delivery);
+
+                                    if message_detail.is_ok() {
+                                        let message_detail = message_detail.unwrap();
+                                        let rt = tokio::runtime::Runtime::new().unwrap();
+                                        rt.block_on(async {
+                                            let redis_client = get_redis_client().await;
+                                            if  redis_client.is_err() {
+                                                return;
+                                            }
+                                            let redis_client = redis_client.unwrap();
+                                            let ollama = Ollama::default();
+                                            let model_name = message_detail.name.clone();
+                                            let  model_stream = ollama.pull_model_stream(model_name, false).await;
+                                            if model_stream.is_ok() {
+                                                let mut model_stream : PullModelStatusStream = model_stream.unwrap();
+                                                while let Some(d) = model_stream.next().await {
+                                                    if d.is_err() {
+                                                        println!("failed to download model : {}", message_detail.name);
+                                                        mark_model_as_failed(&redis_client, &message_detail.name).await;
+                                                        break;
+                                                    }
+
+                                                    let d = d.unwrap();
+                                                    let completed = match d.completed {
+                                                        Some(g) => g, 
+                                                        None => 1,
+                                                    };
+
+                                                    let total: u64 = match d.total {
+                                                        Some(g) => g, 
+                                                        None => 2,
+                                                    };
+                                                    update_model_progress(&redis_client, &message_detail.name, completed, total);            
+                                                }
+                                                mark_model_as_completed(&redis_client, &message_detail.name).await;
+                                            }
+                                            // Handle the stream result here if needed
+                                        });;
+
+                                    }
+
                                     if let Err(e) = consumer.ack(delivery) {
                                         println!("Failed to acknowledge message: {:?}", e);
                                     }

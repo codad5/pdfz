@@ -1,5 +1,6 @@
 import express, { Express, Request, Response, Application } from 'express';
 import dotenv from 'dotenv';
+import bodyParser from 'body-parser';
 import { upload, uploadExists, processedExists, getProcessedFilePath } from '@/helpers/uploadhelper';
 import { ResponseHelper } from '@/helpers/response';
 import mqConnection, { Queue } from '@/lib/rabbitmq';
@@ -14,10 +15,13 @@ import {
     isModelDownloading,
     getModelProgress,
     getModelStatus,
-    ModelStatus
+    ModelStatus,
+    modelDownloadService
 } from '@/lib/redis';
 import fs from 'fs';
-import ollama from 'ollama';
+import { Ollama } from 'ollama';
+
+const ollama = new Ollama({host: process.env.OLLAMA_BASE_URL})
 
 dotenv.config();
 
@@ -37,6 +41,8 @@ async function initializeConnections() {
 }
 
 // Middleware
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 app.use((req, res, next) => {
     ResponseHelper.registerExpressResponse(req, res);
@@ -187,6 +193,7 @@ app.post('/model/pull', async (req: Request, res: Response) => {
 
         // Check if model is already available locally
         const availableModels = await ollama.list();
+        console.log("avaliable models", availableModels)
         const modelExists = availableModels.models.some(m => m.name === model);
 
         if (modelExists) {
@@ -199,7 +206,7 @@ app.post('/model/pull', async (req: Request, res: Response) => {
         }
 
         // Check if model is already in queue or downloading
-        const modelStatus = await getModelStatus(model);
+        const modelStatus = await modelDownloadService.getModelStatus(model);
         if (modelStatus === ModelStatus.QUEUED || modelStatus === ModelStatus.DOWNLOADING) {
             const progress = await getModelProgress(model);
             ResponseHelper.success({
@@ -220,7 +227,7 @@ app.post('/model/pull', async (req: Request, res: Response) => {
         }
 
         // Initialize model download tracking
-        await startModelDownload(model);
+        await modelDownloadService.startModelDownload(model);
 
         ResponseHelper.success({
             message: 'Model download queued successfully',

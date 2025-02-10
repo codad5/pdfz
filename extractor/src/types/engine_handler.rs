@@ -3,7 +3,7 @@ use lapin::message;
 use redis::Client;
 use tokio::{sync::Semaphore, task};
 use std::future::Future;
-use crate::{engine::tesseract::TesseractEngine, helper::file_helper::save_processed_json, libs::redis::{mark_as, Status}, worker::NewFileProcessQueue};
+use crate::{engine::tesseract::TesseractEngine, helper::file_helper::save_processed_json, libs::redis::{ mark_as_done, mark_as_failed, Status}, worker::NewFileProcessQueue};
 
 
 
@@ -43,13 +43,13 @@ impl Engines {
             let result = match result {
                 Ok(res) => {
                     save_processed_json(res, id);
-                    if let Err(e) = mark_as(&redis_client, id, Status::Done).await {
+                    if let Err(e) = mark_as_done(&redis_client, id).await {
                         eprintln!("Error marking as success: {}", e);
                     }
                 },
                 Err(e) => {
                     eprintln!("Error processing file: {}", e);
-                    if let Err(e) = mark_as(&redis_client, id, Status::Failed).await {
+                    if let Err(e) = mark_as_failed(&redis_client, id).await {
                         eprintln!("Error marking as failed: {}", e);
                     }
                     return;
