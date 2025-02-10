@@ -1,10 +1,13 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{clone, collections::HashMap, error::Error, fmt::Debug, io::Cursor, sync::Arc};
+use image::{ImageBuffer, ImageFormat, ImageReader, RgbaImage};
 use lapin::message;
+use lopdf::{xobject::PdfImage, Document};
+use ollama_rs::Ollama;
 use redis::Client;
 use tokio::{sync::Semaphore, task};
 use std::future::Future;
-use crate::{engine::tesseract::TesseractEngine, helper::file_helper::save_processed_json, libs::redis::{mark_as, Status}, worker::NewFileProcessQueue};
-
+use crate::{engine::{ollama::OllamaEngine, tesseract::TesseractEngine, MainEngine}, helper::file_helper::{self, save_processed_json}, libs::redis::{ mark_as_done, mark_as_failed, mark_progress, Status}, worker::NewFileProcessQueue};
+use std::pin::Pin;
 
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -15,53 +18,43 @@ pub struct PageExtractInfo {
     pub image_text: Vec<String>,
 }
 pub enum Engines {
-    Tesseract
+    Tesseract,
+    Ollama
 }
 
 impl Engines {
     pub fn from(engine: &str) -> Option<Self> {
         match engine.to_lowercase().as_str() {
             "tesseract" => Some(Engines::Tesseract),
+            "ollama" => Some(Engines::Ollama),
             _ => None,
         }
     }
 
-    pub fn get_handler(&self) -> impl EngineHandler {
+    pub fn get_handler(&self, model: Option<String>) -> Box<dyn EngineHandler> {
         match self {
-            Engines::Tesseract => TesseractEngine::new(),
+            Engines::Ollama => Box::new(OllamaEngine::new(model)),
+            Engines::Tesseract => Box::new(TesseractEngine::new(None)),
         }
     }
+
 
     pub async fn handle(&self, message: NewFileProcessQueue, redis_client: &Arc<Client>, semaphore: &Arc<Semaphore>) {
         let redis_client = redis_client.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let engine = self.get_handler();
+        let engine = self.get_handler(message.model.clone());
         task::spawn(async move {
-            println!("Processing file: {}", message.file);
-            let id = message.file.split('.').next().unwrap_or("");
-            let result = engine.handle(&message).await;
-            let result = match result {
-                Ok(res) => {
-                    save_processed_json(res, id);
-                    if let Err(e) = mark_as(&redis_client, id, Status::Done).await {
-                        eprintln!("Error marking as success: {}", e);
-                    }
-                },
-                Err(e) => {
-                    eprintln!("Error processing file: {}", e);
-                    if let Err(e) = mark_as(&redis_client, id, Status::Failed).await {
-                        eprintln!("Error marking as failed: {}", e);
-                    }
-                    return;
-                }
-            };
+            let main_handler = MainEngine::new(engine, message);
+            main_handler.run(redis_client).await;
             drop(permit);
         });
     }
 }
 
-pub trait EngineHandler: Send {
-    fn new() -> Self where Self: Sized;
-    fn handle<'a>(&'a self, message: &'a NewFileProcessQueue) -> impl Future<Output = Result<Vec<PageExtractInfo>, Box<dyn std::error::Error + Send + Sync>>> + Send + 'a;
-}
 
+pub trait EngineHandler: Send + Sync + Debug {
+    fn new(model: Option<String>) -> Self where Self: Sized;
+    
+    fn extract_text_from_image(&self, image_path: String) 
+        -> Pin<Box<dyn Future<Output = Result<String, Box<dyn Error + Send>>> + Send>>;
+}

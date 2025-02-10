@@ -19,9 +19,13 @@ services:
       - RABBITMQ_EXTRACTOR_QUEUE=${RABBITMQ_EXTRACTOR_QUEUE}
       - SHARED_STORAGE_PATH=/shared_storage
       - TRAINING_DATA_PATH=/training_data
+      - OLLAMA_BASE_URL=${OLLAMA_HOST}:${OLLAMA_PORT} # Added Ollama URL
+      - OLLAMA_BASE_PORT=${OLLAMA_PORT}  # Added Ollama URL
+      - OLLAMA_BASE_HOST=${OLLAMA_HOST}  # Added Ollama URL
     depends_on:
       - redis
       - rabbitmq
+      - ollama  # Ensure Ollama starts before this service
     command: ["cargo", "run"]
 
   api:
@@ -45,10 +49,14 @@ services:
       - PROTO_PATH=/app/proto
       - API_PORT=${API_PORT}
       - RABBITMQ_EXTRACTOR_QUEUE=${RABBITMQ_EXTRACTOR_QUEUE}
+      - OLLAMA_BASE_URL=${OLLAMA_HOST}:${OLLAMA_PORT} # Added Ollama URL
+      - OLLAMA_BASE_PORT=${OLLAMA_PORT}  # Added Ollama URL
+      - OLLAMA_BASE_HOST=${OLLAMA_HOST}  # Added Ollama URL
     depends_on:
       - redis
       - rabbitmq
       - extractor
+      - ollama  # Ensure Ollama starts before this service
     command: ["npm", "run", "dev"]
 
   redis:
@@ -75,9 +83,24 @@ services:
       timeout: 10s
       retries: 5
 
+  ollama:
+    image: ollama/ollama
+    container_name: ollama-pdfz
+    ports:
+      - "${OLLAMA_PORT}:11434"  # Expose Ollama API
+    volumes:
+      - ollama_data:/root/.ollama  # Persist downloaded models
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   cargo-cache:
   training_data:
   redis-data:
   shared_storage:
   rabbitmq-data:
+  ollama_data:

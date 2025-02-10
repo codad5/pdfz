@@ -22,6 +22,8 @@ uuid = "1.12.0"
 amiquip = "0.4.2"
 tracing = "0.1.41"
 anyhow = "1.0.95"
+base64 = "0.22.1"
+ollama-rs = {version = "0.2.4", features = ['stream']}
 
 [build-dependencies]
 tonic-build = "0.12.3"

@@ -2,115 +2,70 @@
 
 Developed by [codad5](https://github.com/codad5)
 
-PDFz is designed to streamline the extraction and processing of text from PDF files, making it easier to manage and analyze large volumes of documents. By leveraging Rust for the Extractor Service, the project addresses performance bottlenecks, ensuring efficient and fast processing of PDF files.
+PDFz streamlines the extraction and processing of text from PDF files so that you can manage and analyze large volumes of documents effortlessly. By leveraging a microservices architecture, PDFz achieves high performance through:
 
-This project consists of a microservices-based system for extracting and processing PDF files. It includes:
-
-- **Extractor Service** (Rust): Handles file processing using Tesseract OCR.
-- **API Service** (Node.js): Provides endpoints for uploading and managing file extraction.
-- **Redis**: Caching and tracking progress.
-- **RabbitMQ**: Message queuing between API and Extractor.
-- **Docker**: Containerized deployment for all services.
+- **Extractor Service (Rust):** Processes PDF files and extracts text using configurable extraction engines. While Tesseract OCR is supported, PDFz is designed to work with multiple extraction methods.
+- **API Service (Express & TypeScript):** Provides endpoints for file uploads, processing, progress tracking, and interacting with advanced extraction and model-based processing.
+- **Redis:** Caches and tracks file and model processing progress.
+- **RabbitMQ:** Manages message queuing between services.
+- **Model-Based Processing:** Integrate with engines like Ollama for advanced text processing using locally hosted large language models (LLMs).
 
 ---
 
 ## Features
 
-- Upload PDF files via the API.
-- Queue files for processing.
-- Extract text from PDFs using OCR (Tesseract).
-- Track file processing progress.
-- Store extracted data.
-
----
-
-## Upcoming Features
-
-### Ollama Integration (Coming Soon)
-We are working on integrating **Ollama** to enable advanced text processing capabilities using locally run large language models (LLMs). This will allow you to:
-- Summarize extracted text from PDFs.
-- Perform question-answering on the content.
-- Generate insights or reports from the processed data.
-
-Stay tuned for updates!
+- **File Upload:** Send PDF files to the API.
+- **Multi-Engine File Processing:** Choose your extraction engine—whether Tesseract OCR, Ollama, or others—to process PDFs asynchronously.
+- **OCR & Model-Based Extraction:**  
+  - Use Tesseract OCR for traditional optical character recognition.
+  - Leverage model-based extraction (e.g., using Ollama) for advanced processing such as summarization, question-answering, or generating insights.
+- **Progress Tracking:** Monitor file processing progress in real time.
+- **Processed Content Retrieval:** Get back JSON with extracted content.
+- **Model Management:**  
+  - Pull and download a specified model if it isn’t available locally.
+  - Track model download progress.
+  - List available models for advanced extraction needs.
 
 ---
 
 ## Architecture
 
-- **API Service**: Handles file uploads and processing requests.
-- **Extractor Service**: Processes queued files asynchronously.
-- **Redis**: Tracks file processing states.
-- **RabbitMQ**: Message queue for job dispatch.
+- **API Service (Express & TypeScript):**  
+  Provides endpoints for:
+  - Uploading files (`/upload`)
+  - Initiating file processing (`/process/:id`)
+  - Checking file processing progress (`/progress/:id`)
+  - Retrieving processed content (`/content/:id`)
+  - Managing models (pulling via `/model/pull`, tracking progress with `/model/progress/:name`, and listing models with `/models`)
 
----
+- **Extractor Service (Rust):**  
+  Processes queued PDF files using the chosen extraction engine. It supports both traditional OCR (e.g., Tesseract) and model-based extraction (e.g., via Ollama) and interacts with Redis and RabbitMQ for job tracking.
 
-## Setup
+- **Redis:**  
+  Maintains state and progress information for file and model processing.
 
-### Prerequisites
+- **RabbitMQ:**  
+  Facilitates job dispatching between the API and Extractor services.
 
-#### For Docker Deployment:
-- Docker & Docker Compose
-
-#### For Local Development:
-- **API Service**:
-  - Node.js & npm
-  - Redis
-  - RabbitMQ
-- **Extractor Service**:
-  - Rust & Cargo
-  - Redis
-  - RabbitMQ
-  - Tesseract OCR
-
----
-
-### Installation
-
-1. Clone the repository:
-   ```sh
-   git clone https://github.com/codad5/pdfz.git
-   cd pdfz
-   ```
-
-2. Create an `.env` file for environment variables:
-   ```sh
-   cp .env.example .env
-   ```
-
-3. Update `.env` variables (e.g., ports, RabbitMQ, Redis credentials).
-
-4. Build and start the services:
-   ```sh
-   docker-compose up --build
-   ```
-
----
-
-## Services & Environment Variables
-
-### Extractor Service (Rust)
-
-- `RUST_LOG=debug` - Log level
-- `REDIS_URL` - Redis connection URL
-- `RABBITMQ_URL` - RabbitMQ connection
-- `EXTRACTOR_PORT` - Service port
-- `SHARED_STORAGE_PATH` - Mounted storage
-- `TRAINING_DATA_PATH` - Path to Tesseract training data
-- `PROTO_PATH` - Path to Protobuf files
-
-### API Service (Node.js)
-
-- `NODE_ENV=development`
-- `REDIS_URL` - Redis connection
-- `RABBITMQ_URL` - RabbitMQ connection
-- `API_PORT` - API listening port
-- `SHARED_STORAGE_PATH` - Mounted storage
-- `PROTO_PATH` - Path to Protobuf files
+- **Ollama & Other Engines:**  
+  Provides advanced processing capabilities by serving locally hosted language models. The system is extensible to support additional extraction or processing engines in the future.
 
 ---
 
 ## API Endpoints
+
+### Welcome
+
+```http
+GET /
+```
+
+Returns a welcome message:
+```
+PDFz server is life 🔥🔥
+```
+
+---
 
 ### Upload a File
 
@@ -118,9 +73,10 @@ Stay tuned for updates!
 POST /upload
 ```
 
-**Request:** Multipart form-data with a `pdf` file.
+**Request:** Multipart form-data containing a `pdf` file.
 
-**Response:**
+**Response Example:**
+
 ```json
 {
   "success": true,
@@ -142,16 +98,38 @@ POST /upload
 POST /process/:id
 ```
 
-**Request:** JSON body
+**Request:** JSON body with processing options:
+- `startPage` (default: 1)
+- `pageCount` (default: 0)
+- `priority` (default: 1)
+- `engine` — extraction engine (e.g., `"tesseract"` or `"ollama"`)
+- `model` — required if the selected engine is model-based (e.g., `"ollama"`)
+
+Examples:
+
+Using Tesseract:
 ```json
 {
   "startPage": 1,
   "pageCount": 10,
-  "priority": 1
+  "priority": 1,
+  "engine": "tesseract"
 }
 ```
 
-**Response:**
+Using Ollama:
+```json
+{
+  "startPage": 1,
+  "pageCount": 10,
+  "priority": 1,
+  "engine": "ollama",
+  "model": "llama3.2-vision"  // ":latest" will be appended if no tag is provided
+}
+```
+
+**Response Example:**
+
 ```json
 {
   "success": true,
@@ -173,13 +151,14 @@ POST /process/:id
 
 ---
 
-### Track Progress
+### Track File Processing Progress
 
 ```http
 GET /progress/:id
 ```
 
-**Response:**
+**Response Example:**
+
 ```json
 {
   "success": true,
@@ -200,7 +179,8 @@ GET /progress/:id
 GET /content/:id
 ```
 
-**Response:**
+**Response Example:**
+
 ```json
 {
   "success": true,
@@ -210,11 +190,11 @@ GET /content/:id
     "content": [
       {
         "page_num": 1,
-        "text": "This is the text from page 1."
+        "text": "Text from page 1."
       },
       {
         "page_num": 2,
-        "text": "This is the text from page 2."
+        "text": "Text from page 2."
       }
     ],
     "status": "completed"
@@ -224,49 +204,176 @@ GET /content/:id
 
 ---
 
-## Local Development
+### Pull a Model (for Model-Based Extraction)
 
-### Running the API Locally
+```http
+POST /model/pull
+```
 
-1. Install dependencies:
-   ```sh
-   cd api
-   npm install
-   ```
+**Request:** JSON body with the model name:
 
-2. Start the API service:
-   ```sh
-   npm run dev
-   ```
+```json
+{
+  "model": "model-name"
+}
+```
 
-3. Ensure Redis and RabbitMQ are running locally.
+**Response Examples:**
+
+- **If the model already exists:**
+
+  ```json
+  {
+    "success": true,
+    "message": "Model already exists locally",
+    "model": "model-name",
+    "status": "exists"
+  }
+  ```
+
+- **If the model is queued for download:**
+
+  ```json
+  {
+    "success": true,
+    "message": "Model download queued successfully",
+    "model": "model-name",
+    "status": "queued",
+    "progress": 0
+  }
+  ```
 
 ---
 
-### Running the Extractor Locally
+### Track Model Download Progress
 
-1. Install dependencies:
+```http
+GET /model/progress/:name
+```
+
+**Response Example:**
+
+```json
+{
+  "success": true,
+  "message": "Model progress retrieved successfully",
+  "data": {
+    "name": "model-name",
+    "progress": 75,
+    "status": "downloading"
+  }
+}
+```
+
+---
+
+### List Available Models
+
+```http
+GET /models
+```
+
+**Response Example:**
+
+```json
+{
+  "success": true,
+  "message": "Models retrieved successfully",
+  "data": {
+    "models": [
+      {
+        "name": "model1:latest",
+        "size": "1.2GB",
+        "modified_at": "2023-10-01T12:00:00Z"
+      },
+      {
+        "name": "model2:latest",
+        "size": "900MB",
+        "modified_at": "2023-09-28T08:30:00Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Setup
+
+### Prerequisites
+
+#### For Docker Deployment:
+- Docker & Docker Compose
+
+#### For Local Development:
+
+**API Service (Node.js & Express):**
+- Node.js & npm
+- Redis
+- RabbitMQ
+
+**Extractor Service (Rust):**
+- Rust & Cargo
+- Redis
+- RabbitMQ
+- At least one extraction engine (e.g., Tesseract OCR or an alternative)
+
+**Ollama Service (for model-based extraction):**
+- Docker container (or a local installation of Ollama)
+
+---
+
+### Installation
+
+1. **Clone the Repository:**
+
    ```sh
-   cd extractor
-   cargo build
+   git clone https://github.com/codad5/pdfz.git
+   cd pdfz
    ```
 
-2. Install Tesseract OCR:
-   - On Ubuntu:
-     ```sh
-     sudo apt install tesseract-ocr
-     ```
-   - On macOS:
-     ```sh
-     brew install tesseract
-     ```
+2. **Create an `.env` File:**
 
-3. Start the Extractor service:
    ```sh
-   cargo run
+   cp .env.example .env
    ```
 
-4. Ensure Redis and RabbitMQ are running locally.
+3. **Update Environment Variables:**  
+   Modify the `.env` file to set your ports, RabbitMQ and Redis credentials, and extraction/model settings.
+
+4. **Build and Start the Services:**
+
+   ```sh
+   docker-compose up --build
+   ```
+
+---
+
+## Services & Environment Variables
+
+### Extractor Service (Rust)
+
+- `RUST_LOG=debug`  
+- `REDIS_URL` — Redis connection URL  
+- `RABBITMQ_URL` — RabbitMQ connection URL (e.g., `amqp://user:pass@rabbitmq:5672`)  
+- `EXTRACTOR_PORT` — Port for the Extractor Service  
+- `SHARED_STORAGE_PATH` — Mount point for file storage  
+- `TRAINING_DATA_PATH` — Path to training data for extraction engines  
+- `OLLAMA_BASE_URL` — Base URL for Ollama (e.g., `http://ollama:11434`)  
+- `OLLAMA_BASE_PORT` — Ollama port (e.g., `11434`)  
+- `OLLAMA_BASE_HOST` — Host for Ollama
+
+### API Service (Node.js)
+
+- `NODE_ENV=development`  
+- `REDIS_URL` — Redis connection URL  
+- `RABBITMQ_URL` — RabbitMQ connection URL  
+- `API_PORT` — Port for the API service  
+- `SHARED_STORAGE_PATH` — Mount point for file storage  
+- `RABBITMQ_EXTRACTOR_QUEUE` — Queue name for file extraction requests  
+- `OLLAMA_BASE_URL` — Base URL for Ollama  
+- `OLLAMA_BASE_PORT` — Ollama port  
+- `OLLAMA_BASE_HOST` — Host for Ollama
 
 ---
 
@@ -274,17 +381,114 @@ GET /content/:id
 
 The `docker-compose.yml` file defines the following services:
 
-- **extractor**: Rust-based service for processing PDFs.
-- **api**: Node.js-based service for handling API requests.
-- **redis**: Redis instance for caching and tracking progress.
-- **rabbitmq**: RabbitMQ instance for message queuing.
+```yaml
+services:
+  extractor:
+    build:
+      context: ./extractor
+      dockerfile: Dockerfile
+    volumes:
+      - ./extractor:/extractor
+      - cargo-cache:/usr/local/cargo/registry
+      - ${TRAINING_DATA_PATH}:/training_data
+      - ${SHARED_STORAGE_PATH}:/shared_storage
+    working_dir: /extractor
+    environment:
+      - RUST_LOG=debug
+      - REDIS_URL=${REDIS_URL}
+      - REDIS_PORT=${REDIS_PORT}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:${RABBITMQ_PORT}
+      - EXTRACTOR_PORT=${EXTRACTOR_PORT}
+      - EXTRACTOR_URL=${EXTRACTOR_URL}
+      - RABBITMQ_EXTRACTOR_QUEUE=${RABBITMQ_EXTRACTOR_QUEUE}
+      - SHARED_STORAGE_PATH=/shared_storage
+      - TRAINING_DATA_PATH=/training_data
+      - OLLAMA_BASE_URL=${OLLAMA_HOST}:${OLLAMA_PORT}  # Added Ollama URL
+      - OLLAMA_BASE_PORT=${OLLAMA_PORT}                # Added Ollama URL
+      - OLLAMA_BASE_HOST=${OLLAMA_HOST}                # Added Ollama URL
+    depends_on:
+      - redis
+      - rabbitmq
+      - ollama
+    command: ["cargo", "run"]
 
-### Volumes:
-- `cargo-cache`: Caches Rust dependencies.
-- `training_data`: Stores Tesseract training data.
-- `redis-data`: Persists Redis data.
-- `shared_storage`: Shared storage for uploaded and processed files.
-- `rabbitmq-data`: Persists RabbitMQ data.
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+      - ${SHARED_STORAGE_PATH}:/shared_storage
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=${REDIS_URL}
+      - REDIS_PORT=${REDIS_PORT}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:${RABBITMQ_PORT}
+      - EXTRACTOR_PORT=${EXTRACTOR_PORT}
+      - EXTRACTOR_URL=${EXTRACTOR_URL}
+      - SHARED_STORAGE_PATH=/shared_storage
+      - PROTO_PATH=/app/proto
+      - API_PORT=${API_PORT}
+      - RABBITMQ_EXTRACTOR_QUEUE=${RABBITMQ_EXTRACTOR_QUEUE}
+      - OLLAMA_BASE_URL=${OLLAMA_HOST}:${OLLAMA_PORT}  # Added Ollama URL
+      - OLLAMA_BASE_PORT=${OLLAMA_PORT}                # Added Ollama URL
+      - OLLAMA_BASE_HOST=${OLLAMA_HOST}                # Added Ollama URL
+    depends_on:
+      - redis
+      - rabbitmq
+      - extractor
+      - ollama
+    command: ["npm", "run", "dev"]
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "${RABBITMQ_PORT}:5672"      # AMQP port
+      - "${RABBITMQ_UI_PORT}:15672"    # Management UI port
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama-pdfz
+    ports:
+      - "${OLLAMA_PORT}:11434"  # Expose Ollama API
+    volumes:
+      - ollama_data:/root/.ollama  # Persist downloaded models
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  cargo-cache:
+  training_data:
+  redis-data:
+  shared_storage:
+  rabbitmq-data:
+  ollama_data:
+```
 
 ---
 
@@ -296,8 +500,8 @@ For more details, visit the [GitHub repository](https://github.com/codad5/pdfz).
 
 ## Contributing
 
-1. Fork the repository and create a new branch.
-2. Make changes and test locally.
+1. Fork the repository and create a new branch.  
+2. Make changes and test locally.  
 3. Submit a pull request.
 
 ---
