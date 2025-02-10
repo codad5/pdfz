@@ -77,7 +77,8 @@ app.post('/upload', upload.single('pdf'), async (req: Request, res: Response) =>
 app.post('/process/:id', async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const { startPage = 1, pageCount = 0, priority = 1, engine = 'tesseract', model = '' } = req.body as ProcessOptions;
+        const { startPage = 1, pageCount = 0, priority = 1, engine = 'tesseract' } = req.body as ProcessOptions;
+        let model = (req.body as ProcessOptions).model;
 
         if (!uploadExists(`${id}.pdf`)) {
             throw new Error('File not found');
@@ -99,20 +100,31 @@ app.post('/process/:id', async (req: Request, res: Response) => {
         }
 
         if (engine === 'ollama') {
+            if (!model) {
+                throw new Error('Model must be specified when using Ollama engine');
+            }
+
+            // Add :latest tag if no tag is specified
+            if (!model.includes(':')) {
+                model = `${model}:latest`;
+            }
+
             const availableModels = await ollama.list();
             const modelExists = availableModels.models.some(m => m.name === model);
 
             if (!modelExists) {
-                throw new Error(`Model ${model} is not available. Please use the /model/pull endpoint to download it.`);
+                throw new Error(
+                    `Model ${model} is not available. Please use the /model/pull endpoint to download it.`
+                );
             }
         }
-
+        
         const d = await mqConnection.sendToQueue(Queue.NEW_FILE_EXTRACT, {
             file: `${id}.pdf`,
             start_page: startPage,
-            page_count: pageCount, 
+            page_count: pageCount,
             format: 'text',
-            engine, 
+            engine,
             model
         });
 
@@ -131,7 +143,6 @@ app.post('/process/:id', async (req: Request, res: Response) => {
             progress: 0,
             queuedAt: new Date()
         });
-
     } catch (error) {
         ResponseHelper.error(
             (error as Error).message ?? 'File processing failed',
