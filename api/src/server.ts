@@ -52,7 +52,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.get('/', (req: Request, res: Response) => {
-    res.send('Welcome to Express & TypeScript Server');
+    res.send('PDFz server is life 🔥🔥');
 });
 
 app.post('/upload', upload.single('pdf'), async (req: Request, res: Response) => {
