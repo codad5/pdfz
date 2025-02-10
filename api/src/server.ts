@@ -3,11 +3,12 @@ import dotenv from 'dotenv';
 import { upload, uploadExists, processedExists, getProcessedFilePath } from '@/helpers/uploadhelper';
 import { ResponseHelper } from '@/helpers/response';
 import mqConnection, { Queue } from '@/lib/rabbitmq';
-import { NewFileProcessQueue, ProcessedFile } from '@/types/queue';
+import { NewFileProcessQueue, OllamaModelPull, ProcessedFile } from '@/types/queue';
 import { ProcessResponse, UploadResponse, ProgressResponse, FinalResponse } from '@/types/response';
 import { ProcessOptions } from '@/types/request';
 import { getProgress, isFileInProcessing, startFileProcess } from '@/lib/redis';
 import fs from 'fs';
+import ollama from 'ollama'
 
 dotenv.config();
 
@@ -166,6 +167,67 @@ app.get('/content/:id', async (req: Request, res: Response) => {
         ResponseHelper.error(
             (error as Error).message ?? 'Failed to retrieve processed content',
             { message: (error as Error).message ?? 'Failed to retrieve processed content' }
+        );
+    }
+});
+app.post('/model/pull', async (req: Request, res: Response) => {
+    try {
+        const { model } = req.body;
+
+        if (!model) {
+            throw new Error('Model name is required');
+        }
+
+        // Check if model is already available locally
+        const availableModels = await ollama.list();
+        const modelExists = availableModels.models.some(m => m.name === model);
+
+        if (modelExists) {
+            ResponseHelper.success({
+                message: 'Model already exists locally',
+                model,
+                status: 'exists'
+            });
+            return;
+        }
+
+        // Send model pull request to RabbitMQ
+        const pullRequest: OllamaModelPull = { name: model };
+        const queueResult = await mqConnection.sendToQueue(Queue.OLLAMA_MODEL_PULL, pullRequest);
+
+        if (!queueResult) {
+            throw new Error('Failed to queue model download');
+        }
+
+        ResponseHelper.success({
+            message: 'Model download queued successfully',
+            model,
+            status: 'queued'
+        });
+    } catch (error) {
+        ResponseHelper.error(
+            (error as Error).message ?? 'Model download failed',
+            { message: (error as Error).message ?? 'Model download failed' }
+        );
+    }
+});
+
+app.get('/models', async (req: Request, res: Response) => {
+    try {
+        const availableModels = await ollama.list();
+        
+        ResponseHelper.success({
+            message: 'Models retrieved successfully',
+            models: availableModels.models.map(m => ({
+                name: m.name,
+                size: m.size,
+                modified_at: m.modified_at
+            }))
+        });
+    } catch (error) {
+        ResponseHelper.error(
+            (error as Error).message ?? 'Failed to retrieve models',
+            { message: (error as Error).message ?? 'Failed to retrieve models' }
         );
     }
 });

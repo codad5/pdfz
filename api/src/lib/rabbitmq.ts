@@ -1,17 +1,19 @@
-import { NewFileProcessQueue } from "@/types/queue";
+import { NewFileProcessQueue, OllamaModelPull } from "@/types/queue";
 import client, { Connection, Channel, ConsumeMessage } from "amqplib";
 
 const { RABBITMQ_URL } = process.env;
 
 export enum Queue {
     NEW_FILE_EXTRACT = "NEW_FILE_EXTRACT",
+    OLLAMA_MODEL_PULL = "OLLAMA_MODEL_PULL"
     // Add other queue names here
 }
+
 
 // Define interface for mapping Queue enum to message types
 interface QueueMessageMap {
     [Queue.NEW_FILE_EXTRACT]: NewFileProcessQueue;
-    // Add other queue message type mappings here
+    [Queue.OLLAMA_MODEL_PULL]: OllamaModelPull;
 }
 
 
