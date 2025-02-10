@@ -6,9 +6,18 @@ import mqConnection, { Queue } from '@/lib/rabbitmq';
 import { NewFileProcessQueue, OllamaModelPull, ProcessedFile } from '@/types/queue';
 import { ProcessResponse, UploadResponse, ProgressResponse, FinalResponse } from '@/types/response';
 import { ProcessOptions } from '@/types/request';
-import { getProgress, isFileInProcessing, startFileProcess } from '@/lib/redis';
+import {
+    getFileProgress,
+    isFileInProcessing,
+    startFileProcess,
+    startModelDownload,
+    isModelDownloading,
+    getModelProgress,
+    getModelStatus,
+    ModelStatus
+} from '@/lib/redis';
 import fs from 'fs';
-import ollama from 'ollama'
+import ollama from 'ollama';
 
 dotenv.config();
 
@@ -72,10 +81,8 @@ app.post('/process/:id', async (req: Request, res: Response) => {
 
         if (await isFileInProcessing(id)) {
             console.log('File is already in processing');
-            let progress = await getProgress(id);
-            if(!progress) {
-                progress = 0;
-            }
+            const progress = await getFileProgress(id) ?? 0;
+            
             ResponseHelper.success<ProcessResponse>({
                 id,
                 file: `${id}.pdf`,
@@ -126,7 +133,7 @@ app.get('/progress/:id', async (req: Request, res: Response) => {
             throw new Error('File not found');
         }
 
-        const progress = await getProgress(id);
+        const progress = await getFileProgress(id);
         const status = await isFileInProcessing(id) ? 'processing' : 'completed';
 
         ResponseHelper.success<ProgressResponse>({
@@ -150,16 +157,15 @@ app.get('/content/:id', async (req: Request, res: Response) => {
         const processedFilePath = getProcessedFilePath(`${id}.json`);
 
         if (!processedExists(`${id}.json`)) {
-
             throw new Error('Processed file not found');
         }
 
         const processedContent = fs.readFileSync(processedFilePath, 'utf-8');
-        const content = JSON.parse(processedContent); // Parse the JSON content
+        const content = JSON.parse(processedContent);
 
         ResponseHelper.success<FinalResponse>({
             id,
-            content : content as ProcessedFile,
+            content: content as ProcessedFile,
             message: 'Processed content retrieved successfully',
             status: 'completed'
         });
@@ -170,6 +176,7 @@ app.get('/content/:id', async (req: Request, res: Response) => {
         );
     }
 });
+
 app.post('/model/pull', async (req: Request, res: Response) => {
     try {
         const { model } = req.body;
@@ -191,6 +198,19 @@ app.post('/model/pull', async (req: Request, res: Response) => {
             return;
         }
 
+        // Check if model is already in queue or downloading
+        const modelStatus = await getModelStatus(model);
+        if (modelStatus === ModelStatus.QUEUED || modelStatus === ModelStatus.DOWNLOADING) {
+            const progress = await getModelProgress(model);
+            ResponseHelper.success({
+                message: `Model is already ${modelStatus.toLowerCase()}`,
+                model,
+                status: modelStatus.toLowerCase(),
+                progress
+            });
+            return;
+        }
+
         // Send model pull request to RabbitMQ
         const pullRequest: OllamaModelPull = { name: model };
         const queueResult = await mqConnection.sendToQueue(Queue.OLLAMA_MODEL_PULL, pullRequest);
@@ -199,15 +219,48 @@ app.post('/model/pull', async (req: Request, res: Response) => {
             throw new Error('Failed to queue model download');
         }
 
+        // Initialize model download tracking
+        await startModelDownload(model);
+
         ResponseHelper.success({
             message: 'Model download queued successfully',
             model,
-            status: 'queued'
+            status: 'queued',
+            progress: 0
         });
     } catch (error) {
         ResponseHelper.error(
             (error as Error).message ?? 'Model download failed',
             { message: (error as Error).message ?? 'Model download failed' }
+        );
+    }
+});
+
+app.get('/model/progress/:name', async (req: Request, res: Response) => {
+    try {
+        const { name } = req.params;
+
+        if (!name) {
+            throw new Error('Model name is required');
+        }
+
+        const progress = await getModelProgress(name);
+        const status = await getModelStatus(name);
+
+        if (!status) {
+            throw new Error('Model not found in queue');
+        }
+
+        ResponseHelper.success({
+            name,
+            progress,
+            status: status.toLowerCase(),
+            message: 'Model progress retrieved successfully'
+        });
+    } catch (error) {
+        ResponseHelper.error(
+            (error as Error).message ?? 'Failed to retrieve model progress',
+            { message: (error as Error).message ?? 'Failed to retrieve model progress' }
         );
     }
 });
