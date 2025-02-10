@@ -43,7 +43,14 @@ impl EngineHandler for OllamaEngine {
             let request = GenerationRequest::new(model, PROMPT.to_string())
                 .add_image(Image::from_base64(&base64_image));
 
-            let ollama = Ollama::default();
+            let base_host = std::env::var("OLLAMA_BASE_HOST")
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+            let base_port = std::env::var("OLLAMA_BASE_PORT")
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?
+                .parse::<u16>()
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+
+            let ollama = Ollama::new(base_host, base_port);
             let response = ollama.generate(request).await
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
 
@@ -52,13 +59,3 @@ impl EngineHandler for OllamaEngine {
     }
 }
 
-async fn send_request<'a>(
-    request: GenerationRequest<'a>,
-) -> Result<GenerationResponse, Box<dyn std::error::Error>> {
-    let ollama = Ollama::default();
-    let res = ollama.list_local_models().await?;
-
-    println!("all Models: {:?}", res);
-    let response = ollama.generate(request).await?;
-    Ok(response)
-}
