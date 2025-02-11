@@ -6,15 +6,115 @@
   <title>PDF Extractor</title>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    .tabs { display: flex; margin-bottom: 20px; }
-    .tab { padding: 10px 20px; cursor: pointer; background: #ddd; margin-right: 5px; }
-    .tab.active { background: #007bff; color: white; }
-    .content { display: none; }
-    .content.active { display: block; }
-    .progress-container { margin-top: 10px; }
-    .progress-bar { height: 20px; background: #007bff; width: 0%; transition: width 0.5s; }
-    .input-group { margin-bottom: 10px; }
+    body { 
+      font-family: Arial, sans-serif; 
+      padding: 20px; 
+      max-width: 1200px;
+      margin: 0 auto;
+      background-color: #f5f5f5;
+    }
+    .tabs { 
+      display: flex; 
+      margin-bottom: 20px; 
+      background: white;
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .tab { 
+      padding: 10px 20px; 
+      cursor: pointer; 
+      background: #f0f0f0; 
+      margin-right: 5px;
+      border-radius: 4px;
+      transition: all 0.3s ease;
+    }
+    .tab.active { 
+      background: #007bff; 
+      color: white; 
+    }
+    .content { 
+      display: none; 
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .content.active { 
+      display: block; 
+    }
+    .progress-container { 
+      margin-top: 10px;
+      background: #f0f0f0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .progress-bar { 
+      height: 20px; 
+      background: #007bff; 
+      width: 0%; 
+      transition: width 0.5s;
+      border-radius: 10px;
+    }
+    .input-group { 
+      margin-bottom: 15px;
+    }
+    .input-group label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+    }
+    input[type="text"],
+    input[type="number"],
+    input[type="file"],
+    select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    #modelList {
+      list-style: none;
+      padding: 0;
+    }
+    #modelList li {
+      padding: 10px;
+      border: 1px solid #ddd;
+      margin-bottom: 5px;
+      border-radius: 4px;
+      background: #f8f9fa;
+    }
+    .error {
+      color: #dc3545;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 5px;
+    }
+    .success {
+      color: #28a745;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -25,7 +125,10 @@
 
   <div id="pdf-extraction" class="content active">
     <h2>Upload and Process PDF</h2>
-    <input type="file" id="pdfUpload" accept="application/pdf" />
+    <div class="input-group">
+      <label>Select PDF File</label>
+      <input type="file" id="pdfUpload" accept="application/pdf" />
+    </div>
     <button onclick="uploadPDF()">Upload</button>
     <br /><br />
 
@@ -39,16 +142,17 @@
 
     <div id="modelSelection" style="display: none;" class="input-group">
       <label>Ollama Model:</label>
-      <input type="text" id="modelName" placeholder="Enter model name" />
+      <select id="modelName">
+        <option value="">Select a model...</option>
+      </select>
     </div>
 
-    <!-- New input fields for process options -->
     <div class="input-group">
       <label>Start Page:</label>
       <input type="number" id="startPage" value="1" min="1" />
     </div>
     <div class="input-group">
-      <label>Page Count:</label>
+      <label>Page Count (0 for all pages):</label>
       <input type="number" id="pageCount" value="0" min="0" />
     </div>
     <div class="input-group">
@@ -71,8 +175,17 @@
 
   <div id="model-management" class="content">
     <h2>Model Management</h2>
-    <input type="text" id="newModelName" placeholder="Enter model name" />
+    <div class="input-group">
+      <label>Model Name</label>
+      <input type="text" id="newModelName" placeholder="Enter model name (e.g., llama2:latest)" />
+    </div>
     <button onclick="pullModel()">Download Model</button>
+    <div id="modelPullProgress" style="display: none;">
+      <div class="progress-container">
+        <div class="progress-bar" id="modelPullProgressBar"></div>
+      </div>
+      <p id="modelPullProgressText">Starting download...</p>
+    </div>
     <br /><br />
 
     <h3>Available Models</h3>
@@ -81,19 +194,24 @@
 
   <script>
     let uploadedFileId = '';
+    let currentProgressInterval = null;
+    let modelPullInterval = null;
 
-    // Tab switching logic
     $('.tab').click(function () {
       $('.tab').removeClass('active');
       $(this).addClass('active');
       $('.content').removeClass('active');
       $($(this).data('target')).addClass('active');
+      
+      if ($(this).data('target') === '#model-management') {
+        fetchModelList();
+      }
     });
 
-    // Show/hide model selection based on engine
     $('#engineSelect').change(function () {
       if ($(this).val() === 'ollama') {
         $('#modelSelection').show();
+        fetchModelList(); // Update model dropdown
       } else {
         $('#modelSelection').hide();
       }
@@ -119,8 +237,8 @@
           uploadedFileId = response.data.id;
           alert("Upload successful!");
         },
-        error: function () {
-          alert("Upload failed");
+        error: function (error) {
+          alert("Upload failed: " + (error.responseJSON?.message || "Unknown error"));
         }
       });
     }
@@ -133,12 +251,11 @@
 
       let engine = $('#engineSelect').val();
       let model = $('#modelName').val();
-      // Read the new processing options
       let startPage = parseInt($('#startPage').val()) || 1;
       let pageCount = parseInt($('#pageCount').val()) || 0;
       let priority = parseInt($('#priority').val()) || 1;
 
-      let data = { engine: engine, startPage, pageCount, priority };
+      let data = { engine, startPage, pageCount, priority };
 
       if (engine === 'ollama') {
         if (!model) {
@@ -154,17 +271,36 @@
         contentType: "application/json",
         data: JSON.stringify(data),
         success: function (response) {
-          alert("Processing started!");
-          trackProgress(uploadedFileId);
+          if (response.data.status === 'processing' || 
+              response.data.message === 'File is already in processing') {
+            $('#progressText').text('File is already being processed...');
+            if (!currentProgressInterval) {
+              trackProgress(uploadedFileId);
+            }
+          } else {
+            resetProgress();
+            trackProgress(uploadedFileId);
+          }
         },
-        error: function () {
-          alert("Failed to start processing");
+        error: function (error) {
+          alert("Failed to start processing: " + (error.responseJSON?.message || "Unknown error"));
+          $('#progressText').text('Processing failed to start');
         }
       });
     }
 
+    function resetProgress() {
+      if (currentProgressInterval) {
+        clearInterval(currentProgressInterval);
+        currentProgressInterval = null;
+      }
+      $('#progressBar').css('width', '0%');
+      $('#progressText').text('Starting new process...');
+      $('#extractedText').text('');
+    }
+
     function trackProgress(id) {
-      let interval = setInterval(() => {
+      currentProgressInterval = setInterval(() => {
         $.get(`/progress/${id}`, function (response) {
           let progress = response.data.progress;
           let status = response.data.status;
@@ -173,12 +309,15 @@
           $('#progressText').text(`Progress: ${progress}% - ${status}`);
 
           if (status === 'completed') {
-            clearInterval(interval);
+            clearInterval(currentProgressInterval);
+            currentProgressInterval = null;
             fetchExtractedText(id);
           }
-        }).fail(() => {
-          clearInterval(interval);
-          alert("Failed to fetch progress");
+        }).fail((error) => {
+          clearInterval(currentProgressInterval);
+          currentProgressInterval = null;
+          $('#progressText').text('Failed to fetch progress: ' + 
+            (error.responseJSON?.message || "Unknown error"));
         });
       }, 2000);
     }
@@ -186,51 +325,107 @@
     function fetchExtractedText(id) {
       $.get(`/content/${id}`, function (response) {
         $('#extractedText').text(JSON.stringify(response.data.content, null, 2));
-      }).fail(() => {
-        alert("Failed to retrieve extracted text");
+      }).fail((error) => {
+        $('#extractedText').text('Failed to retrieve extracted text: ' + 
+          (error.responseJSON?.message || "Unknown error"));
       });
     }
 
     function pullModel() {
-      let modelName = $('#newModelName').val();
+      const modelName = $('#newModelName').val();
       if (!modelName) {
         alert("Enter a model name");
         return;
       }
 
+      $('#modelPullProgress').show();
+      
       $.ajax({
         url: "/model/pull",
         type: "POST",
         contentType: "application/json",
         data: JSON.stringify({ model: modelName }),
         success: function (response) {
-          alert("Model download started!");
-          fetchModelList();
+          trackModelPull(modelName);
         },
-        error: function () {
-          alert("Failed to start model download");
+        error: function (error) {
+          alert("Failed to start model download: " + 
+            (error.responseJSON?.message || "Unknown error"));
+          $('#modelPullProgress').hide();
         }
       });
     }
 
+    function trackModelPull(modelName) {
+      if (modelPullInterval) {
+        clearInterval(modelPullInterval);
+      }
+
+      modelPullInterval = setInterval(() => {
+        $.get(`/model/progress/${modelName}`, function (response) {
+          const progress = response.data.progress;
+          const status = response.data.status;
+
+          $('#modelPullProgressBar').css('width', progress + '%');
+          $('#modelPullProgressText').text(
+            `${status.charAt(0).toUpperCase() + status.slice(1)}: ${progress}%`
+          );
+
+          if (status === 'completed') {
+            clearInterval(modelPullInterval);
+            setTimeout(() => {
+              $('#modelPullProgress').hide();
+              fetchModelList();
+            }, 2000);
+          }
+        }).fail((error) => {
+          clearInterval(modelPullInterval);
+          $('#modelPullProgressText').text('Failed to fetch progress: ' + 
+            (error.responseJSON?.message || "Unknown error"));
+        });
+      }, 2000);
+    }
+
     function fetchModelList() {
       $.get("/models", function (response) {
-        let models = response.data.models;
-        // Convert size from bytes to MB (2 decimals)
+        const models = response.data.models;
+        
+        // Update the models list in the management tab
         $('#modelList').html(
-          models
-            .map(
-              m =>
-                `<li>${m.name} (${(m.size / (1024 * 1024)).toFixed(2)} MB)</li>`
-            )
-            .join("")
+          models.map(m => `
+            <li>
+              <strong>${m.name}</strong><br>
+              Size: ${formatBytes(m.size)}<br>
+              Modified: ${new Date(m.modified_at).toLocaleString()}
+            </li>
+          `).join("")
         );
-      }).fail(() => {
-        alert("Failed to retrieve model list");
+
+        // Update the model selection dropdown
+        $('#modelName').html(`
+          <option value="">Select a model...</option>
+          ${models.map(m => `<option value="${m.name}">${m.name}</option>`).join("")}
+        `);
+      }).fail((error) => {
+        $('#modelList').html(
+          '<li class="error">Failed to retrieve models: ' + 
+          (error.responseJSON?.message || "Unknown error") + '</li>'
+        );
       });
     }
 
-    $(document).ready(fetchModelList);
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Initialize the interface
+    $(document).ready(function() {
+      fetchModelList();
+    });
   </script>
 </body>
 </html>
