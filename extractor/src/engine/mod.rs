@@ -97,8 +97,9 @@ impl MainEngine {
         }
 
         if let Ok(page_images) = doc.get_page_images(page_id) {
+            let file_id = self.message.file.split('.').next().unwrap_or("");
             for (i, image) in page_images.iter().enumerate() {
-                let image_name = format!("{}_{}.png", page_num, i);
+                let image_name = format!("{}_{}_{}.png",file_id ,page_num, i);
                 let image_path = file_helper::get_pdf_image_process_path(image_name.as_str());
                 
                 if Self::save_pdf_image(&image, image_path.to_str().unwrap()).is_ok() {
