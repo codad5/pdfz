@@ -15,7 +15,7 @@ use std::future::Future;
 use crate::types::engine_handler::PageExtractInfo;
 use crate::{helper::file_helper, libs::redis::mark_progress, types::engine_handler::EngineHandler, worker::NewFileProcessQueue};
 
-const PROMPT: &str = "Only return the text you can see in this image";
+const PROMPT: &str = "Please perform OCR on the supplied image and output the extracted text exactly as it appears. If the image contains multiple columns or sections, preserve the structural layout as much as possible. Do not include any explanations, commentary, or formatting modifications.";
 
 #[derive(Debug, Clone)]
 pub struct OllamaEngine {
