@@ -1,8 +1,7 @@
-use std::{sync::Arc, thread};
-use amiquip::{Channel, Connection, ConsumerMessage, ConsumerOptions, Delivery, QueueDeclareOptions, Result as AmiqpResult};
+use std::{sync::Arc};
+use amiquip::{Connection, ConsumerMessage, ConsumerOptions, Delivery, QueueDeclareOptions, Result as AmiqpResult};
 use futures_lite::StreamExt;
 use ollama_rs::{models::pull::PullModelStatusStream, Ollama};
-use redis::Client;
 use tokio::sync::Semaphore;
 
 use crate::{libs::redis::{get_redis_client, mark_model_as_completed, mark_model_as_failed, update_model_progress}, types::engine_handler::Engines, worker::{NewFileProcessQueue, OllamaModelPull}};
@@ -104,6 +103,7 @@ impl RabbitMQFileProcessor {
                                     let message_detail = Self::get_model_message(&delivery);
                                     if message_detail.is_ok() {
                                         let message_detail = message_detail.unwrap();
+                                        // TODO: integrate the model pull
                                         // download_model_stream(message_detail.name).await;
                                     }                                    
                                     if let Err(e) = consumer.ack(delivery) {
@@ -137,7 +137,7 @@ async fn download_model_stream(model_name : String){
         while let Some(d) = model_stream.next().await {
             if d.is_err() {
                 println!("failed to download model : {}", model_name);
-                mark_model_as_failed(&redis_client, &model_name).await;
+                let _ = mark_model_as_failed(&redis_client, &model_name).await;
                 break;
             }
 

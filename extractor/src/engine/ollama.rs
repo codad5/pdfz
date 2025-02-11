@@ -1,19 +1,11 @@
 use std::fs;
 use std::pin::Pin;
-use std::{collections::HashMap, io::Read};
-use std::path::Path;
 use base64::Engine;
-use lopdf::{xobject::PdfImage, Document};
-use image::{ImageBuffer, Rgba, RgbaImage, ImageFormat, ImageReader};
 use ollama_rs::generation::completion::request::GenerationRequest;
-use ollama_rs::generation::completion::GenerationResponse;
 use ollama_rs::generation::images::Image;
 use ollama_rs::Ollama;
-use std::io::Cursor;
-use flate2::read::ZlibDecoder;
 use std::future::Future;
-use crate::types::engine_handler::PageExtractInfo;
-use crate::{helper::file_helper, libs::redis::mark_progress, types::engine_handler::EngineHandler, worker::NewFileProcessQueue};
+use crate::types::engine_handler::EngineHandler;
 
 const PROMPT: &str = "Please perform OCR on the supplied image and output the extracted text exactly as it appears. If the image contains multiple columns or sections, preserve the structural layout as much as possible. Do not include any explanations, commentary, or formatting modifications.";
 
