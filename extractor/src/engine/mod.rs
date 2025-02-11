@@ -61,8 +61,11 @@ impl MainEngine {
         
         // Get actual page count and determine the limit
         let actual_page_count = doc.get_pages().len() as u32;
-        let page_limit = process_queue.page_count.min(actual_page_count);
-        
+        let mut page_limit = process_queue.page_count.min(actual_page_count);
+        if page_limit <= 0 {
+            page_limit = actual_page_count;
+        }
+        let page_limit = page_limit;
         // Convert start_page to 0-based index if pages are 0-based
         let start_page = process_queue.start_page.saturating_sub(1); 
 
