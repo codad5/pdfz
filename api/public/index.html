@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Extractor</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .tabs { display: flex; margin-bottom: 20px; }
+    .tab { padding: 10px 20px; cursor: pointer; background: #ddd; margin-right: 5px; }
+    .tab.active { background: #007bff; color: white; }
+    .content { display: none; }
+    .content.active { display: block; }
+    .progress-container { margin-top: 10px; }
+    .progress-bar { height: 20px; background: #007bff; width: 0%; transition: width 0.5s; }
+    .input-group { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="tabs">
+    <div class="tab active" data-target="#pdf-extraction">PDF Extraction</div>
+    <div class="tab" data-target="#model-management">Model Management</div>
+  </div>
+
+  <div id="pdf-extraction" class="content active">
+    <h2>Upload and Process PDF</h2>
+    <input type="file" id="pdfUpload" accept="application/pdf" />
+    <button onclick="uploadPDF()">Upload</button>
+    <br /><br />
+
+    <div class="input-group">
+      <label>Engine:</label>
+      <select id="engineSelect">
+        <option value="tesseract">Tesseract</option>
+        <option value="ollama">Ollama</option>
+      </select>
+    </div>
+
+    <div id="modelSelection" style="display: none;" class="input-group">
+      <label>Ollama Model:</label>
+      <input type="text" id="modelName" placeholder="Enter model name" />
+    </div>
+
+    <!-- New input fields for process options -->
+    <div class="input-group">
+      <label>Start Page:</label>
+      <input type="number" id="startPage" value="1" min="1" />
+    </div>
+    <div class="input-group">
+      <label>Page Count:</label>
+      <input type="number" id="pageCount" value="0" min="0" />
+    </div>
+    <div class="input-group">
+      <label>Priority:</label>
+      <input type="number" id="priority" value="1" min="1" />
+    </div>
+
+    <button onclick="processPDF()">Process PDF</button>
+    <br /><br />
+
+    <h3>Progress</h3>
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <p id="progressText">Waiting for processing...</p>
+
+    <h3>Extracted Text</h3>
+    <pre id="extractedText"></pre>
+  </div>
+
+  <div id="model-management" class="content">
+    <h2>Model Management</h2>
+    <input type="text" id="newModelName" placeholder="Enter model name" />
+    <button onclick="pullModel()">Download Model</button>
+    <br /><br />
+
+    <h3>Available Models</h3>
+    <ul id="modelList"></ul>
+  </div>
+
+  <script>
+    let uploadedFileId = '';
+
+    // Tab switching logic
+    $('.tab').click(function () {
+      $('.tab').removeClass('active');
+      $(this).addClass('active');
+      $('.content').removeClass('active');
+      $($(this).data('target')).addClass('active');
+    });
+
+    // Show/hide model selection based on engine
+    $('#engineSelect').change(function () {
+      if ($(this).val() === 'ollama') {
+        $('#modelSelection').show();
+      } else {
+        $('#modelSelection').hide();
+      }
+    });
+
+    function uploadPDF() {
+      const fileInput = $('#pdfUpload')[0].files[0];
+      if (!fileInput) {
+        alert("Please select a file");
+        return;
+      }
+
+      let formData = new FormData();
+      formData.append("pdf", fileInput);
+
+      $.ajax({
+        url: "/upload",
+        type: "POST",
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function (response) {
+          uploadedFileId = response.data.id;
+          alert("Upload successful!");
+        },
+        error: function () {
+          alert("Upload failed");
+        }
+      });
+    }
+
+    function processPDF() {
+      if (!uploadedFileId) {
+        alert("No file uploaded yet.");
+        return;
+      }
+
+      let engine = $('#engineSelect').val();
+      let model = $('#modelName').val();
+      // Read the new processing options
+      let startPage = parseInt($('#startPage').val()) || 1;
+      let pageCount = parseInt($('#pageCount').val()) || 0;
+      let priority = parseInt($('#priority').val()) || 1;
+
+      let data = { engine: engine, startPage, pageCount, priority };
+
+      if (engine === 'ollama') {
+        if (!model) {
+          alert("Please specify a model for Ollama");
+          return;
+        }
+        data.model = model;
+      }
+
+      $.ajax({
+        url: `/process/${uploadedFileId}`,
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify(data),
+        success: function (response) {
+          alert("Processing started!");
+          trackProgress(uploadedFileId);
+        },
+        error: function () {
+          alert("Failed to start processing");
+        }
+      });
+    }
+
+    function trackProgress(id) {
+      let interval = setInterval(() => {
+        $.get(`/progress/${id}`, function (response) {
+          let progress = response.data.progress;
+          let status = response.data.status;
+
+          $('#progressBar').css('width', progress + '%');
+          $('#progressText').text(`Progress: ${progress}% - ${status}`);
+
+          if (status === 'completed') {
+            clearInterval(interval);
+            fetchExtractedText(id);
+          }
+        }).fail(() => {
+          clearInterval(interval);
+          alert("Failed to fetch progress");
+        });
+      }, 2000);
+    }
+
+    function fetchExtractedText(id) {
+      $.get(`/content/${id}`, function (response) {
+        $('#extractedText').text(JSON.stringify(response.data.content, null, 2));
+      }).fail(() => {
+        alert("Failed to retrieve extracted text");
+      });
+    }
+
+    function pullModel() {
+      let modelName = $('#newModelName').val();
+      if (!modelName) {
+        alert("Enter a model name");
+        return;
+      }
+
+      $.ajax({
+        url: "/model/pull",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ model: modelName }),
+        success: function (response) {
+          alert("Model download started!");
+          fetchModelList();
+        },
+        error: function () {
+          alert("Failed to start model download");
+        }
+      });
+    }
+
+    function fetchModelList() {
+      $.get("/models", function (response) {
+        let models = response.data.models;
+        // Convert size from bytes to MB (2 decimals)
+        $('#modelList').html(
+          models
+            .map(
+              m =>
+                `<li>${m.name} (${(m.size / (1024 * 1024)).toFixed(2)} MB)</li>`
+            )
+            .join("")
+        );
+      }).fail(() => {
+        alert("Failed to retrieve model list");
+      });
+    }
+
+    $(document).ready(fetchModelList);
+  </script>
+</body>
+</html>

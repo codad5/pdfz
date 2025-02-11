@@ -21,6 +21,7 @@ import {
 } from '@/lib/redis';
 import fs from 'fs';
 import { Ollama } from 'ollama';
+import path from 'path';
 
 const ollama = new Ollama({host: process.env.OLLAMA_BASE_URL})
 
@@ -49,6 +50,8 @@ app.use((req, res, next) => {
     ResponseHelper.registerExpressResponse(req, res);
     next();
 });
+
+app.use('/web', express.static(path.join(__dirname, '../public')));
 
 // Routes
 app.get('/', (req: Request, res: Response) => {
