@@ -46,7 +46,7 @@ impl MainEngine {
     }
 
 
-     async fn extract_file(&self, process_queue: &NewFileProcessQueue) -> Result<Vec<PageExtractInfo>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn extract_file(&self, process_queue: &NewFileProcessQueue) -> Result<Vec<PageExtractInfo>, Box<dyn std::error::Error + Send + Sync>> {
         println!("Extracting file {}", process_queue.file);
         let path = file_helper::get_upload_path(format!("{}", process_queue.file).as_str());
         println!("Processing {:?}", path);
@@ -56,37 +56,39 @@ impl MainEngine {
         }
 
         let doc = Document::load(path).map_err(|e| format!("Error loading PDF file: {}", e))?;
-        let mut page_count = 0;
         let file_id = process_queue.file.split('.').next().unwrap_or("");
         let mut all_page_info: Vec<PageExtractInfo> = Vec::new();
-        let total_page = doc.get_pages().len();
-        let total_page = if total_page < process_queue.page_count.try_into().unwrap() {
-            process_queue.page_count
-        } else {
-            total_page.try_into().unwrap()
-        };
+        
+        // Get actual page count and determine the limit
+        let actual_page_count = doc.get_pages().len() as u32;
+        let page_limit = process_queue.page_count.min(actual_page_count);
+        
+        // Convert start_page to 0-based index if pages are 0-based
+        let start_page = process_queue.start_page.saturating_sub(1); 
 
         for (page_num, page_id) in doc.get_pages() {
-            if page_count > total_page {
-                println!("page limit reached {:?}", total_page);
-                break;
-            }
-            if process_queue.start_page > page_num {
+            
+            // Skip pages before start_page
+            if page_num < process_queue.start_page {
                 continue;
             }
             
+            // Break if we've processed enough pages
+            if all_page_info.len() >= page_limit as usize {
+                println!("Page limit reached: {}", page_limit);
+                break;
+            }
+            
             println!("Extracting page {}", page_num);
-            let page_info: PageExtractInfo = self.process_page(&doc, page_num, page_id).await;
+            let page_info = self.process_page(&doc, page_num, page_id).await;
             println!("Extracted page {} with {} images", page_num, page_info.image_path.len());
             
-            mark_progress(file_id, page_num, total_page).await?;
+            mark_progress(file_id, page_num, page_limit).await?;
             all_page_info.push(page_info);
-            page_count += 1;
         }
         
         Ok(all_page_info)
     }
-
      async fn process_page(&self, doc: &Document, page_num: u32, page_id: (u32, u16)) -> PageExtractInfo {
         let mut image_paths: Vec<String> = vec![];
         let mut image_text: Vec<String> = vec![];
