@@ -60,14 +60,15 @@ impl MainEngine {
         let file_id = process_queue.file.split('.').next().unwrap_or("");
         let mut all_page_info: Vec<PageExtractInfo> = Vec::new();
         let total_page = doc.get_pages().len();
-        let total_pages = if total_page > process_queue.page_count.try_into().unwrap() {
+        let total_page = if total_page > process_queue.page_count.try_into().unwrap() {
             process_queue.page_count
         } else {
             total_page.try_into().unwrap()
         };
 
         for (page_num, page_id) in doc.get_pages() {
-            if page_count > total_pages {
+            if page_count > total_page {
+                println!("page limit reached {:?}", total_page);
                 break;
             }
             if process_queue.start_page > page_num {
@@ -78,7 +79,7 @@ impl MainEngine {
             let page_info: PageExtractInfo = self.process_page(&doc, page_num, page_id).await;
             println!("Extracted page {} with {} images", page_num, page_info.image_path.len());
             
-            mark_progress(file_id, page_num, total_pages).await?;
+            mark_progress(file_id, page_num, total_page).await?;
             all_page_info.push(page_info);
             page_count += 1;
         }
