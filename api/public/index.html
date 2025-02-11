@@ -304,9 +304,9 @@
         $.get(`/progress/${id}`, function (response) {
           let progress = response.data.progress;
           let status = response.data.status;
-
+          let pageCount = parseInt($('#pageCount').val()) || 0;
           $('#progressBar').css('width', progress + '%');
-          $('#progressText').text(`Progress: ${progress}% - ${status}`);
+          $('#progressText').text(`Progress: ${progress}% - ${status} ${pageCount > 0 ? `${(progress*pageCount)/100}/${pageCount}` : ''}`);
 
           if (status === 'completed') {
             clearInterval(currentProgressInterval);
