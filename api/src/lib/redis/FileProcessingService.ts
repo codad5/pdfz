@@ -43,7 +43,7 @@ export class FileProcessingService extends BaseRedisService {
             FileStatus.PENDING,
             ttl
         );
-
+        await this.markProgress(fileId, 0, 1)
         await this.markAsPending(fileId)
     }
 
