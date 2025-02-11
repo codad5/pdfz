@@ -60,7 +60,7 @@ impl MainEngine {
         let file_id = process_queue.file.split('.').next().unwrap_or("");
         let mut all_page_info: Vec<PageExtractInfo> = Vec::new();
         let total_page = doc.get_pages().len();
-        let total_page = if total_page > process_queue.page_count.try_into().unwrap() {
+        let total_page = if total_page < process_queue.page_count.try_into().unwrap() {
             process_queue.page_count
         } else {
             total_page.try_into().unwrap()
