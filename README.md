@@ -32,6 +32,7 @@ PDFz streamlines the extraction and processing of text from PDF files so that yo
 
 - **API Service (Express & TypeScript):**  
   Provides endpoints for:
+  - Web Interface files (`/web`)
   - Uploading files (`/upload`)
   - Initiating file processing (`/process/:id`)
   - Checking file processing progress (`/progress/:id`)
@@ -64,6 +65,15 @@ Returns a welcome message:
 ```
 PDFz server is life 🔥🔥
 ```
+
+---
+
+### Web Interface
+
+```http
+GET /web
+```
+- Shows the web interface 
 
 ---
 
