@@ -338,7 +338,7 @@
         return;
       }
 
-      $('#modelPullProgress').show();
+
       
       $.ajax({
         url: "/model/pull",
@@ -346,6 +346,11 @@
         contentType: "application/json",
         data: JSON.stringify({ model: modelName }),
         success: function (response) {
+          if(response.data.status === 'exists') {
+            alert(`Model ${response.data.model} already exist`);
+            return;
+          } 
+          $('#modelPullProgress').show();
           trackModelPull(modelName);
         },
         error: function (error) {

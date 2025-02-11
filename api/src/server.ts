@@ -208,10 +208,13 @@ app.get('/content/:id', async (req: Request, res: Response) => {
 
 app.post('/model/pull', async (req: Request, res: Response) => {
     try {
-        const { model } = req.body;
+        let { model } = req.body;
 
         if (!model) {
             throw new Error('Model name is required');
+        }
+        if (!model.includes(':')) {
+            model = `${model}:latest`;
         }
 
         // Check if model is already available locally
@@ -268,14 +271,19 @@ app.post('/model/pull', async (req: Request, res: Response) => {
 
 app.get('/model/progress/:name', async (req: Request, res: Response) => {
     try {
-        const { name } = req.params;
+        let { name } = req.params;
 
         if (!name) {
             throw new Error('Model name is required');
         }
 
-        const progress = await getModelProgress(name);
-        const status = await getModelStatus(name);
+         if (!name.includes(':')) {
+            name = `${name}:latest`;
+        }
+
+
+        const progress = await modelDownloadService.getModelProgress(name);
+        const status = await modelDownloadService.getModelStatus(name);
 
         if (!status) {
             throw new Error('Model not found in queue');
