@@ -84,7 +84,7 @@ impl MainEngine {
             
             println!("Extracting page {}", page_num);
             let page_info = self.process_page(&doc, page_num, page_id).await;
-            println!("Extracted page {} with {} images", page_num, page_info.image_path.len());
+            println!("Extracted page {} with {:?} images", page_num, page_info);
             
             mark_progress(file_id, page_num, page_limit).await?;
             all_page_info.push(page_info);
@@ -131,9 +131,7 @@ impl MainEngine {
 
         PageExtractInfo {
             page_num,
-            text: text_map.join(" "),
-            image_path: image_paths,
-            image_text,
+            text: text_map.join(" ")
         }
     }
    
