@@ -69,7 +69,7 @@ impl MainEngine {
         for (page_num, page_id) in doc.get_pages() {
             
             // Skip pages before start_page
-            if page_num < process_queue.start_page {
+            if page_num < start_page {
                 continue;
             }
             
