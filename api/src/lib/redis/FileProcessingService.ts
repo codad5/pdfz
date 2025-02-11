@@ -43,10 +43,16 @@ export class FileProcessingService extends BaseRedisService {
             FileStatus.PENDING,
             ttl
         );
+
+        await this.markAsPending(fileId)
     }
 
     async markAsDone(fileId: string): Promise<void> {
         await this.setStatus(fileId, FileStatus.DONE);
+    }
+    
+    async markAsPending(fileId: string): Promise<void> {
+        await this.setStatus(fileId, FileStatus.PENDING);
     }
 
     async markAsFailed(fileId: string): Promise<void> {

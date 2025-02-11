@@ -39,13 +39,12 @@ impl Engines {
     }
 
 
-    pub async fn handle(&self, message: NewFileProcessQueue, redis_client: &Arc<Client>, semaphore: &Arc<Semaphore>) {
-        let redis_client = redis_client.clone();
+    pub async fn handle(&self, message: NewFileProcessQueue,semaphore: &Arc<Semaphore>) {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let engine = self.get_handler(message.model.clone());
         task::spawn(async move {
             let main_handler = MainEngine::new(engine, message);
-            main_handler.run(redis_client).await;
+            main_handler.run().await;
             drop(permit);
         });
     }

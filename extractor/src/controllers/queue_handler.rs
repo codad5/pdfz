@@ -49,7 +49,7 @@ impl RabbitMQFileProcessor {
                     if message.is_ok() {
                         let message = message.unwrap();
                         let engine = Engines::from(message.engine.as_str()).unwrap();
-                        engine.handle(message, &redis_client, &semaphore).await;
+                        engine.handle(message,  &semaphore).await;
                     }
                     file_extract_queue_consumer.ack(delivery)?;
                 }
@@ -125,11 +125,6 @@ impl RabbitMQFileProcessor {
 
 async fn download_model_stream(model_name : String){
 // rt.block_on(async {
-    let redis_client = get_redis_client().await;
-    if  redis_client.is_err() {
-        return;
-    }
-    let redis_client = redis_client.unwrap();
     let ollama = Ollama::default();
     let  model_stream = ollama.pull_model_stream(model_name.clone(), false).await;
 
@@ -137,7 +132,7 @@ async fn download_model_stream(model_name : String){
         while let Some(d) = model_stream.next().await {
             if d.is_err() {
                 println!("failed to download model : {}", model_name);
-                let _ = mark_model_as_failed(&redis_client, &model_name).await;
+                let _ = mark_model_as_failed(&model_name).await;
                 break;
             }
 
@@ -151,7 +146,7 @@ async fn download_model_stream(model_name : String){
                 Some(g) => g, 
                 None => 2,
             };
-            update_model_progress(&redis_client, &model_name, completed, total).await;         
+            update_model_progress(&model_name, completed, total).await;         
         }
-        mark_model_as_completed(&redis_client, &model_name).await;
+        mark_model_as_completed(&model_name).await;
 }

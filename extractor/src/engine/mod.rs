@@ -24,20 +24,20 @@ impl MainEngine {
         }
     }
 
-    pub async fn run(&self, redis_client:Arc<Client>){
+    pub async fn run(&self){
         println!("Processing file: {}", self.message.file);
         let id = self.message.file.split('.').next().unwrap_or("");
         let result = self.extract_file(&self.message).await;
         let result = match result {
             Ok(res) => {
                 save_processed_json(res, id);
-                if let Err(e) = mark_as_done(&redis_client, id).await {
+                if let Err(e) = mark_as_done(id).await {
                     eprintln!("Error marking as success: {}", e);
                 }
             },
             Err(e) => {
                 eprintln!("Error processing file: {}", e);
-                if let Err(e) = mark_as_failed(&redis_client, id).await {
+                if let Err(e) = mark_as_failed(id).await {
                     eprintln!("Error marking as failed: {}", e);
                 }
                 return;
@@ -59,9 +59,15 @@ impl MainEngine {
         let mut page_count = 0;
         let file_id = process_queue.file.split('.').next().unwrap_or("");
         let mut all_page_info: Vec<PageExtractInfo> = Vec::new();
+        let total_page = doc.get_pages().len();
+        let total_pages = if total_page > process_queue.page_count.try_into().unwrap() {
+            process_queue.page_count
+        } else {
+            total_page.try_into().unwrap()
+        };
 
         for (page_num, page_id) in doc.get_pages() {
-            if page_count > process_queue.page_count {
+            if page_count > total_pages {
                 break;
             }
             if process_queue.start_page > page_num {
@@ -72,7 +78,7 @@ impl MainEngine {
             let page_info: PageExtractInfo = self.process_page(&doc, page_num, page_id).await;
             println!("Extracted page {} with {} images", page_num, page_info.image_path.len());
             
-            mark_progress(file_id, page_num, process_queue.page_count).await?;
+            mark_progress(file_id, page_num, total_pages).await?;
             all_page_info.push(page_info);
             page_count += 1;
         }

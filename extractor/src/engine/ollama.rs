@@ -45,7 +45,6 @@ impl EngineHandler for OllamaEngine {
             let ollama = Ollama::new(base_host, base_port);
             let response = ollama.generate(request).await
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
-
             Ok(response.response)
         })
     }
