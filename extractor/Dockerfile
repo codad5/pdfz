@@ -23,9 +23,6 @@ RUN apt-get update && \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install cargo-watch for live reloading
-RUN cargo install cargo-watch
-
 # Set default working directory
 WORKDIR /extractor
 
